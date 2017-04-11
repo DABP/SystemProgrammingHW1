@@ -2,11 +2,11 @@
 * my_assembler 함수를 위한 변수 선언 및 매크로를 담고 있는 헤더 파일이다.
 *
 */
-#define MAX_INST 256
-#define MAX_LINES 5000
+#define MAX_INST 256		// 명령어 최대 개수
+#define MAX_LINES 5000		// 프로그램 코드의 최대 줄 수 
 
-#define MAX_COLUMNS 4
-#define MAX_OPERAND 3
+#define MAX_COLUMNS 4		// label, operator, operand, comment
+#define MAX_OPERAND 3		// 한 operator에서 가질 수 있는 operand의 최대 개수
 
 /*
 * 기계어 목록 파일로 부터 정보를 받아와 생성하는 기계어 변환 테이블이다.

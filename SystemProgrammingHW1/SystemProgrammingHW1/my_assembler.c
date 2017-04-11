@@ -33,7 +33,7 @@
 
 int main(int args, char *arg[])
 {
-	if (init_my_assembler()< 0)
+	if (init_my_assembler() < 0)
 	{
 		printf("init_my_assembler: 프로그램 초기화에 실패 했습니다.\n");
 		return -1;
@@ -125,6 +125,44 @@ static int assem_pass2(void)
 int init_inst_file(char *inst_file)
 {
 	/* add your code here */
+	FILE *inst_file_pointer;
+	fopen_s(&inst_file_pointer, inst_file, "rb");
+	if (inst_file_pointer == NULL) {
+		return -1;
+	}
+	char str_temp[255];
+	char *tmp;
+	inst_index = 0;
+	while (!feof(inst_file_pointer)) {
+
+		tmp = fgets(str_temp, sizeof(str_temp), inst_file_pointer);
+		char *token;
+		char *context = NULL;
+		char *token_tmp;
+		int cnt = 0;
+		token = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokenizing을 한다.
+		inst[inst_index] = (struct inst_struct*)malloc(sizeof(struct inst_struct)); // inst 메모리 할당.
+		
+
+		strcpy_s(inst[inst_index]->str,sizeof(token), token); // 맨 처음의 토큰인 instruction 의 이름을 저장.
+
+		while (token = strtok_s(NULL, "|", &context)) {
+			if (strcmp(token, "\n") != 0) {
+				if (cnt == 0) {
+					inst[inst_index]->format = atoi(token); // 형식(format) 저장
+				}
+				else if (cnt == 1) {
+					inst[inst_index]->op = atoi(token);
+				}
+				else if (cnt == 2) {
+					inst[inst_index]->ops = atoi(token);
+				}
+			}
+			cnt++;
+		}
+		inst_index++;
+	}
+	fclose(inst_file_pointer);
 	return 0;
 }
 
@@ -141,6 +179,7 @@ int init_inst_file(char *inst_file)
 int init_input_file(char *input_file)
 {
 	/* add your code here */
+
 	return 0;
 }
 
