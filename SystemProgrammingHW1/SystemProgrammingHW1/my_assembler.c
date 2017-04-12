@@ -88,7 +88,16 @@ int init_my_assembler(void)
 static int assem_pass1(void)
 {
 	/* add your code here */
-	int a = search_opcode("WD");
+	int cnt = 0;
+	token_line = 0;
+	for (cnt = 0; cnt < line_num; cnt++) {
+		if (input_data[cnt][0] != '.') {
+			token_table[cnt] = (struct token_unit*)malloc(sizeof(struct token_unit));
+			tok_parsing(cnt);
+			token_line++;
+		}
+	}
+
 	return 0;
 }
 
@@ -155,7 +164,7 @@ int init_inst_file(char *inst_file)
 					inst[inst_index]->format = atoi(tok); // 형식(format) 저장
 				}
 				else if (cnt == 1) {
-					inst[inst_index]->op = atoi(tok);
+					inst[inst_index]->op = strtoul(tok, NULL, 16);
 				}
 				else if (cnt == 2) {
 					inst[inst_index]->ops = atoi(tok);
@@ -215,6 +224,8 @@ int init_input_file(char *input_file)
 int tok_parsing(int index)
 {
 	/* add your code here */
+	char *tok = NULL;
+	
 	return 0;
 }
 /* -----------------------------------------------------------------------------------
