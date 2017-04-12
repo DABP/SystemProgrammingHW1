@@ -151,7 +151,7 @@ int init_inst_file(char *inst_file)
 		fgets(str_temp, sizeof(str_temp), inst_file_pointer);
 		tok = NULL;
 		context = NULL;
-		//char *tok_tmp;
+
 		int cnt = 0;
 		tok = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokizing을 한다.
 		inst[inst_index] = (struct inst_struct*)malloc(sizeof(struct inst_struct)); // inst 메모리 할당.
@@ -225,6 +225,14 @@ int tok_parsing(int index)
 {
 	/* add your code here */
 	char *tok = NULL;
+	char *context = NULL;
+
+	tok = strtok_s(input_data[index], "\t", &context);
+	if (search_opcode(tok) < 0) { // label
+		token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
+		strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
+	}
+
 	
 	return 0;
 }
