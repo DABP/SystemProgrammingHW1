@@ -130,21 +130,23 @@ int init_inst_file(char *inst_file)
 	if (inst_file_pointer == NULL) {
 		return -1;
 	}
-	char str_temp[255];
-	char *tmp;
+
 	inst_index = 0;
+	char *token;
+	char *context;
+	char str_temp[255];
+
 	while (!feof(inst_file_pointer)) {
 
-		tmp = fgets(str_temp, sizeof(str_temp), inst_file_pointer);
-		char *token;
-		char *context = NULL;
-		char *token_tmp;
+		fgets(str_temp, sizeof(str_temp), inst_file_pointer);
+		token = NULL;
+		context = NULL;
+		//char *token_tmp;
 		int cnt = 0;
 		token = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokenizing을 한다.
 		inst[inst_index] = (struct inst_struct*)malloc(sizeof(struct inst_struct)); // inst 메모리 할당.
-		
-
-		strcpy_s(inst[inst_index]->str,sizeof(token), token); // 맨 처음의 토큰인 instruction 의 이름을 저장.
+		inst[inst_index]->str = (char *)malloc(strlen(token) + 1);
+		strcpy_s(inst[inst_index]->str, strlen(token) +1, token); // 맨 처음 토큰인 instruction 의 이름을 저장.
 
 		while (token = strtok_s(NULL, "|", &context)) {
 			if (strcmp(token, "\n") != 0) {
