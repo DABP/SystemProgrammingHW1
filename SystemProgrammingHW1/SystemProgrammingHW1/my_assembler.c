@@ -92,7 +92,7 @@ static int assem_pass1(void)
 	token_line = 0;
 	for (cnt = 0; cnt < line_num; cnt++) {
 		if (input_data[cnt][0] != '.') {
-			token_table[cnt] = (struct token_unit*)malloc(sizeof(struct token_unit));
+			token_table[token_line] = (struct token_unit*)malloc(sizeof(struct token_unit));
 			tok_parsing(cnt);
 			token_line++;
 		}
@@ -114,8 +114,23 @@ static int assem_pass1(void)
 
 static int assem_pass2(void)
 {
-
 	/* add your code here */
+	int cnt = 0;
+	for (cnt = 0; cnt < token_line; cnt++) {
+		printf("%s\t\t", token_table[cnt]->label);
+		printf("%s\t", token_table[cnt]->operator_);
+		printf("%s", token_table[cnt]->operand[0]);
+		if (strlen(token_table[cnt]->operand[1]) > 0)
+			printf(",");
+		printf("%s", token_table[cnt]->operand[1]);
+		if (strlen(token_table[cnt]->operand[2]) > 0)
+			printf(",");
+		printf("%s\t", token_table[cnt]->operand[2]);
+		int idx = search_opcode(token_table[cnt]->operator_);
+		if (idx > 0)
+			printf("%02X", inst[idx]->op);
+		printf("\n");
+	}
 	return 0;
 }
 /* -----------------------------------------------------------------------------------
@@ -156,7 +171,7 @@ int init_inst_file(char *inst_file)
 		tok = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokizing을 한다.
 		inst[inst_index] = (struct inst_struct*)malloc(sizeof(struct inst_struct)); // inst 메모리 할당.
 		inst[inst_index]->str = (char *)malloc(strlen(tok) + 1);
-		strcpy_s(inst[inst_index]->str, strlen(tok) +1, tok); // 맨 처음 토큰인 instruction 의 이름을 저장.
+		strcpy_s(inst[inst_index]->str, strlen(tok) + 1, tok); // 맨 처음 토큰인 instruction 의 이름을 저장.
 
 		while (tok = strtok_s(NULL, "|", &context)) {
 			if (strcmp(tok, "\n") != 0) {
@@ -226,14 +241,103 @@ int tok_parsing(int index)
 	/* add your code here */
 	char *tok = NULL;
 	char *context = NULL;
-
+	char operand_tmp[40] = { 0, };
 	tok = strtok_s(input_data[index], "\t", &context);
-	if (search_opcode(tok) < 0) { // label
+	if (search_opcode(tok) < 0 && strcmp(tok, "END")) { // label
 		token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
 		strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
+
+		tok = strtok_s(NULL, "\t", &context); // operator
+	}
+	else {
+		token_table[token_line]->label = (char *)malloc(1);
+		token_table[token_line]->label[0] = '\0';
 	}
 
-	
+	token_table[token_line]->operator_ = (char *)malloc(strlen(tok) + 1);
+	strcpy_s(token_table[token_line]->operator_, strlen(tok) + 1, tok);
+
+	if (strcmp(token_table[token_line]->operator_, "RSUB") != 0) { // RSUB 이 아닐 때
+		if (strcmp(token_table[token_line]->operator_, "END") == 0) { // END 일 때
+			tok = strtok_s(NULL, "\t", &context);
+			token_table[token_line]->operand[0] = (char *)malloc(strlen(tok) + 1);
+			strcpy_s(token_table[token_line]->operand[0], strlen(tok) + 1, tok);
+			int cnt = 0;
+			for (cnt = 1; cnt < MAX_OPERAND; cnt++) {
+				token_table[token_line]->operand[cnt] = (char *)malloc(strlen(tok) + 1);
+				token_table[token_line]->operand[cnt][0] = '\0';
+			}
+			token_table[token_line]->comment = (char *)malloc(1);
+			token_table[token_line]->comment[0] = '\0';
+			return 0;
+		}
+		tok = strtok_s(NULL, "\t", &context); // operand
+		strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
+	}
+	else {
+		operand_tmp[0] = '\0';
+	}
+
+	// comment 초기화 및 대입
+	if (!(tok = strtok_s(NULL, "\t", &context))) { // comment 가 없을 때,
+		token_table[token_line]->comment = (char *)malloc(1);
+		token_table[token_line]->comment[0] = '\0';
+	}
+	else {
+		token_table[token_line]->comment = (char *)malloc(strlen(tok) + 1);
+		strcpy_s(token_table[token_line]->comment, strlen(tok) + 1, tok);
+	}
+
+	// operand 초기화 및 대입
+	if (strlen(operand_tmp) > 0) {
+		if (strchr(operand_tmp, ',') == NULL) { // operand의 개수가 1개일 때.
+			token_table[token_line]->operand[0] = (char *)malloc(strlen(operand_tmp) + 1);
+			int cnt = 1;
+			while (cnt < MAX_OPERAND) {
+				token_table[token_line]->operand[cnt] = (char *)malloc(1);
+				token_table[token_line]->operand[cnt][0] = '\0';
+				cnt++;
+			}
+			strcpy_s(token_table[token_line]->operand[0], strlen(operand_tmp) + 1, operand_tmp);
+
+		}
+		else { // operand 의 개수가 2개 이상
+			char *operand_tok = NULL;
+			char *operand_context = NULL;
+			operand_tok = strtok_s(operand_tmp, ",", &operand_context);
+			token_table[token_line]->operand[0] = (char *)malloc(strlen(operand_tok) + 1);
+			strcpy_s(token_table[token_line]->operand[0], strlen(operand_tok) + 1, operand_tok);
+			int cnt = 1;
+			while (cnt < MAX_OPERAND) {
+				if (operand_tok = strtok_s(NULL, ",", &operand_context)) {
+					token_table[token_line]->operand[cnt] = (char *)malloc(strlen(operand_tok) + 1);
+					strcpy_s(token_table[token_line]->operand[cnt], strlen(operand_tok) + 1, operand_tok);
+				}
+				else {
+					token_table[token_line]->operand[cnt] = (char *)malloc(1);
+					token_table[token_line]->operand[cnt][0] = '\0';
+				}
+				cnt++;
+			}
+		}
+	}
+	else {
+		int cnt = 0;
+		for (cnt = 0; cnt < MAX_OPERAND; cnt++) {
+			token_table[token_line]->operand[cnt] = (char *)malloc(1);
+			token_table[token_line]->operand[cnt][0] = '\0';
+		}
+	}
+	int cnt = 0;
+	for (cnt = 0; cnt < MAX_OPERAND; cnt++) {
+		if (token_table[token_line]->operand[cnt][strlen(token_table[token_line]->operand[cnt]) - 1] == '\n')
+			token_table[token_line]->operand[cnt][strlen(token_table[token_line]->operand[cnt]) - 1] = '\0';
+	}
+	if (token_table[token_line]->comment[strlen(token_table[token_line]->comment) - 1] == '\n')
+		token_table[token_line]->comment[strlen(token_table[token_line]->comment) - 1] = '\0';
+
+
+
 	return 0;
 }
 /* -----------------------------------------------------------------------------------
