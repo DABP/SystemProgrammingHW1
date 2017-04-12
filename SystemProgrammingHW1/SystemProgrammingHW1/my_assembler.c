@@ -66,7 +66,7 @@ int init_my_assembler(void)
 
 	if ((result = init_inst_file("inst.data")) < 0)
 		return -1;
-	if ((result = init_input_file("input")) < 0)
+	if ((result = init_input_file("input.txt")) < 0)
 		return -1;
 	return result;
 }
@@ -88,6 +88,7 @@ int init_my_assembler(void)
 static int assem_pass1(void)
 {
 	/* add your code here */
+	int a = search_opcode("WD");
 	return 0;
 }
 
@@ -132,32 +133,32 @@ int init_inst_file(char *inst_file)
 	}
 
 	inst_index = 0;
-	char *token;
+	char *tok;
 	char *context;
 	char str_temp[255];
 
 	while (!feof(inst_file_pointer)) {
 
 		fgets(str_temp, sizeof(str_temp), inst_file_pointer);
-		token = NULL;
+		tok = NULL;
 		context = NULL;
-		//char *token_tmp;
+		//char *tok_tmp;
 		int cnt = 0;
-		token = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokenizing을 한다.
+		tok = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokizing을 한다.
 		inst[inst_index] = (struct inst_struct*)malloc(sizeof(struct inst_struct)); // inst 메모리 할당.
-		inst[inst_index]->str = (char *)malloc(strlen(token) + 1);
-		strcpy_s(inst[inst_index]->str, strlen(token) +1, token); // 맨 처음 토큰인 instruction 의 이름을 저장.
+		inst[inst_index]->str = (char *)malloc(strlen(tok) + 1);
+		strcpy_s(inst[inst_index]->str, strlen(tok) +1, tok); // 맨 처음 토큰인 instruction 의 이름을 저장.
 
-		while (token = strtok_s(NULL, "|", &context)) {
-			if (strcmp(token, "\n") != 0) {
+		while (tok = strtok_s(NULL, "|", &context)) {
+			if (strcmp(tok, "\n") != 0) {
 				if (cnt == 0) {
-					inst[inst_index]->format = atoi(token); // 형식(format) 저장
+					inst[inst_index]->format = atoi(tok); // 형식(format) 저장
 				}
 				else if (cnt == 1) {
-					inst[inst_index]->op = atoi(token);
+					inst[inst_index]->op = atoi(tok);
 				}
 				else if (cnt == 2) {
-					inst[inst_index]->ops = atoi(token);
+					inst[inst_index]->ops = atoi(tok);
 				}
 			}
 			cnt++;
@@ -181,7 +182,24 @@ int init_inst_file(char *inst_file)
 int init_input_file(char *input_file)
 {
 	/* add your code here */
+	FILE *input_file_pointer;
+	fopen_s(&input_file_pointer, input_file, "r");
+	if (input_file_pointer == NULL) {
+		return -1;
+	}
 
+	line_num = 0;
+	char *tok;
+	char *context;
+	char str_temp[255];
+
+	while (!feof(input_file_pointer)) {
+		fgets(str_temp, sizeof(str_temp), input_file_pointer);
+		input_data[line_num] = (char *)malloc(strlen(str_temp) + 1);
+		strcpy_s(input_data[line_num], strlen(str_temp) + 1, str_temp);
+		line_num++;
+	}
+	fclose(input_file_pointer);
 	return 0;
 }
 
@@ -194,7 +212,7 @@ int init_input_file(char *input_file)
 * -----------------------------------------------------------------------------------
 */
 
-int token_parsing(int index)
+int tok_parsing(int index)
 {
 	/* add your code here */
 	return 0;
@@ -211,7 +229,13 @@ int token_parsing(int index)
 int search_opcode(char *str)
 {
 	/* add your code here */
-	return 0;
+	int cnt = 0;
+	for (cnt = 0; cnt < inst_index; cnt++) {
+		if (strcmp(str, inst[cnt]->str) == 0) {
+			return cnt;
+		}
+	}
+	return -1;
 }
 /* -----------------------------------------------------------------------------------
 * 설명 : 입력된 문자열의 이름을 가진 파일에 프로그램의 결과를 저장하는 함수이다.
