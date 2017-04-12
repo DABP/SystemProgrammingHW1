@@ -25,10 +25,13 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="input.txt">
+    <Text Include="inst.data">
       <Filter>리소스 파일</Filter>
     </Text>
-    <Text Include="inst.data">
+    <Text Include="input_.txt">
+      <Filter>리소스 파일</Filter>
+    </Text>
+    <Text Include="input.txt">
       <Filter>리소스 파일</Filter>
     </Text>
   </ItemGroup>

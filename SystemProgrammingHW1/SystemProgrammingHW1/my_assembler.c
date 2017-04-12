@@ -243,7 +243,7 @@ int tok_parsing(int index)
 	char *context = NULL;
 	char operand_tmp[40] = { 0, };
 	tok = strtok_s(input_data[index], "\t", &context);
-	if (search_opcode(tok) < 0 && strcmp(tok, "END")) { // label
+	if (search_opcode(tok) < 0 && strcmp(tok, "END") ) { // label
 		token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
 		strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
 
