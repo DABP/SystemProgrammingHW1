@@ -216,11 +216,15 @@ int init_input_file(char *input_file)
 	char *tok;
 	char *context;
 	char str_temp[255];
+	char *del;
 
 	while (!feof(input_file_pointer)) {
 		fgets(str_temp, sizeof(str_temp), input_file_pointer);
 		input_data[line_num] = (char *)malloc(strlen(str_temp) + 1);
 		strcpy_s(input_data[line_num], strlen(str_temp) + 1, str_temp);
+		while (del = strchr(input_data[line_num], '\n')) {
+			*del = '\0';
+		}
 		line_num++;
 	}
 	fclose(input_file_pointer);
@@ -242,40 +246,42 @@ int tok_parsing(int index)
 	char *tok = NULL;
 	char *context = NULL;
 	char operand_tmp[40] = { 0, };
+
 	tok = strtok_s(input_data[index], "\t", &context);
 
-	// 첫번째가 라벨이면 
-	if (search_opcode(tok) < 0 && strcmp(tok, "END") &&strcmp(tok, "EXTDEF") && strcmp(tok, "EXTREF") && strcmp(tok, "LTORG") && strcmp(tok, "EQU") && strcmp(tok, "EQU") && strcmp(tok, "CSECT")) { // label
+	// 첫번째가 라벨인 경우 
+	if (search_opcode(tok) < 0 && strcmp(tok, "END") && strcmp(tok, "EXTDEF") && strcmp(tok, "EXTREF") && strcmp(tok, "LTORG") && strcmp(tok, "EQU") && strcmp(tok, "CSECT")) {
 		token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
 		strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
 
 		tok = strtok_s(NULL, "\t", &context); // operator
 	}
-	else {
-		token_table[token_line]->label = (char *)malloc(1);
-		token_table[token_line]->label[0] = '\0';
+	else { // token_table[token_line]->label을 사이즈 0으로 초기화
+		initialize_label(token_line);
 	}
 
 	// operator_ 메모리 할당 및 tok 복사
 	token_table[token_line]->operator_ = (char *)malloc(strlen(tok) + 1);
 	strcpy_s(token_table[token_line]->operator_, strlen(tok) + 1, tok);
 
+	if (strcmp(token_table[token_line]->operator_, "LTORG") == 0) {
+		return 0;
+	}
+
 	if (strcmp(token_table[token_line]->operator_, "RSUB") != 0) { // RSUB 이 아닐 때
 		if (strcmp(token_table[token_line]->operator_, "END") == 0) { // END 일 때
 			tok = strtok_s(NULL, "\t", &context);
 			token_table[token_line]->operand[0] = (char *)malloc(strlen(tok) + 1);
 			strcpy_s(token_table[token_line]->operand[0], strlen(tok) + 1, tok);
-			int cnt = 0;
-			for (cnt = 1; cnt < MAX_OPERAND; cnt++) {
-				token_table[token_line]->operand[cnt] = (char *)malloc(strlen(tok) + 1);
-				token_table[token_line]->operand[cnt][0] = '\0';
-			}
-			token_table[token_line]->comment = (char *)malloc(1);
-			token_table[token_line]->comment[0] = '\0';
+			
+			initialize_operand(token_line, 1);
+			initialize_comment(token_line);
 			return 0;
 		}
-		tok = strtok_s(NULL, "\t", &context); // operand
-		strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
+
+		if ((tok = strtok_s(NULL, "\t", &context)) != NULL) // operand
+			strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
+		else return 0;
 	}
 	else {
 		operand_tmp[0] = '\0';
@@ -283,8 +289,7 @@ int tok_parsing(int index)
 
 	// comment 초기화 및 대입
 	if (!(tok = strtok_s(NULL, "\t", &context))) { // comment 가 없을 때,
-		token_table[token_line]->comment = (char *)malloc(1);
-		token_table[token_line]->comment[0] = '\0';
+		initialize_comment(token_line);
 	}
 	else {
 		token_table[token_line]->comment = (char *)malloc(strlen(tok) + 1);
@@ -295,12 +300,7 @@ int tok_parsing(int index)
 	if (strlen(operand_tmp) > 0) {
 		if (strchr(operand_tmp, ',') == NULL) { // operand의 개수가 1개일 때.
 			token_table[token_line]->operand[0] = (char *)malloc(strlen(operand_tmp) + 1);
-			int cnt = 1;
-			while (cnt < MAX_OPERAND) {
-				token_table[token_line]->operand[cnt] = (char *)malloc(1);
-				token_table[token_line]->operand[cnt][0] = '\0';
-				cnt++;
-			}
+			initialize_operand(token_line, 1);
 			strcpy_s(token_table[token_line]->operand[0], strlen(operand_tmp) + 1, operand_tmp);
 
 		}
@@ -317,8 +317,8 @@ int tok_parsing(int index)
 					strcpy_s(token_table[token_line]->operand[cnt], strlen(operand_tok) + 1, operand_tok);
 				}
 				else {
-					token_table[token_line]->operand[cnt] = (char *)malloc(1);
-					token_table[token_line]->operand[cnt][0] = '\0';
+					initialize_operand(token_ilne, cnt);
+					break;
 				}
 				cnt++;
 			}
@@ -377,6 +377,45 @@ void make_objectcode(char *file_name)
 {
 	/* add your code here */
 
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : token 의 label을 0으로 초기화 하는 함수이다.
+* 매계 : token 의 index
+* 반환 : 없음
+*
+* -----------------------------------------------------------------------------------
+*/
+void initialize_label(int index) {
+	token_table[index]->label = (char *)malloc(sizeof(char));
+	token_table[index]->label[0] = '\0';
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : token 의 operand을 0으로 초기화 하는 함수이다.
+* 매계 : token 의 index, 초기화할 operand 시작 start_num
+* 반환 : 없음
+*
+* -----------------------------------------------------------------------------------
+*/
+void initialize_operand(int index, int start_num) {
+	int cnt = 0;
+	for (cnt = start_num; cnt < MAX_OPERAND; cnt++) {
+		token_table[index]->operand[cnt] = (char *)malloc(sizeof(char));
+		token_table[index]->operand[cnt][0] = '\0';
+	}
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : token 의 comment을 0으로 초기화 하는 함수이다.
+* 매계 : token 의 index
+* 반환 : 없음
+*
+* -----------------------------------------------------------------------------------
+*/
+void initialize_comment(int index) {
+	token_table[index]->comment = (char *)malloc(sizeof(char));
+	token_table[index]->comment[0] = '\0';
 }
 
 
