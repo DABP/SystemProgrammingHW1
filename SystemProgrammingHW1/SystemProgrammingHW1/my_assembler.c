@@ -243,7 +243,9 @@ int tok_parsing(int index)
 	char *context = NULL;
 	char operand_tmp[40] = { 0, };
 	tok = strtok_s(input_data[index], "\t", &context);
-	if (search_opcode(tok) < 0 && strcmp(tok, "END") ) { // label
+
+	// 첫번째가 라벨이면 
+	if (search_opcode(tok) < 0 && strcmp(tok, "END") &&strcmp(tok, "EXTDEF") && strcmp(tok, "EXTREF") && strcmp(tok, "LTORG") && strcmp(tok, "EQU") && strcmp(tok, "EQU") && strcmp(tok, "CSECT")) { // label
 		token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
 		strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
 
@@ -254,6 +256,7 @@ int tok_parsing(int index)
 		token_table[token_line]->label[0] = '\0';
 	}
 
+	// operator_ 메모리 할당 및 tok 복사
 	token_table[token_line]->operator_ = (char *)malloc(strlen(tok) + 1);
 	strcpy_s(token_table[token_line]->operator_, strlen(tok) + 1, tok);
 
