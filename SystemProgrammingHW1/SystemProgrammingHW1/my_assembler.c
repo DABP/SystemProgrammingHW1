@@ -251,20 +251,30 @@ int tok_parsing(int index)
 
 	// 첫번째가 라벨인 경우 
 	if (search_opcode(tok) < 0 && strcmp(tok, "END") && strcmp(tok, "EXTDEF") && strcmp(tok, "EXTREF") && strcmp(tok, "LTORG") && strcmp(tok, "EQU") && strcmp(tok, "CSECT")) {
-		token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
-		strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
+		if (tok[0] != '+') {
+			token_table[token_line]->label = (char *)malloc(strlen(tok) + 1);
+			strcpy_s(token_table[token_line]->label, strlen(tok) + 1, tok);
 
-		tok = strtok_s(NULL, "\t", &context); // operator
+			tok = strtok_s(NULL, "\t", &context); // operator
+		}
+		else {
+			initialize_label(token_line);
+		}
+		
 	}
 	else { // token_table[token_line]->label을 사이즈 0으로 초기화
 		initialize_label(token_line);
 	}
+	
+
 
 	// operator_ 메모리 할당 및 tok 복사
 	token_table[token_line]->operator_ = (char *)malloc(strlen(tok) + 1);
 	strcpy_s(token_table[token_line]->operator_, strlen(tok) + 1, tok);
 
-	if (strcmp(token_table[token_line]->operator_, "LTORG") == 0) {
+	if (strcmp(token_table[token_line]->operator_, "LTORG") == 0 || strcmp(token_table[token_line]->operator_, "CSECT") == 0) {
+		initialize_operand(token_line, 0);
+		initialize_comment(token_line);
 		return 0;
 	}
 
@@ -317,7 +327,7 @@ int tok_parsing(int index)
 					strcpy_s(token_table[token_line]->operand[cnt], strlen(operand_tok) + 1, operand_tok);
 				}
 				else {
-					initialize_operand(token_ilne, cnt);
+					initialize_operand(token_line, cnt);
 					break;
 				}
 				cnt++;
@@ -325,12 +335,9 @@ int tok_parsing(int index)
 		}
 	}
 	else {
-		int cnt = 0;
-		for (cnt = 0; cnt < MAX_OPERAND; cnt++) {
-			token_table[token_line]->operand[cnt] = (char *)malloc(1);
-			token_table[token_line]->operand[cnt][0] = '\0';
-		}
+		initialize_operand(token_line, 0);
 	}
+	/*
 	int cnt = 0;
 	for (cnt = 0; cnt < MAX_OPERAND; cnt++) {
 		if (token_table[token_line]->operand[cnt][strlen(token_table[token_line]->operand[cnt]) - 1] == '\n')
@@ -338,9 +345,7 @@ int tok_parsing(int index)
 	}
 	if (token_table[token_line]->comment[strlen(token_table[token_line]->comment) - 1] == '\n')
 		token_table[token_line]->comment[strlen(token_table[token_line]->comment) - 1] = '\0';
-
-
-
+*/
 	return 0;
 }
 /* -----------------------------------------------------------------------------------
