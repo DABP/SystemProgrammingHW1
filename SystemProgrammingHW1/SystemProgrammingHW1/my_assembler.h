@@ -69,3 +69,6 @@ int init_inst_file(char *inst_file);
 int init_input_file(char *input_file);
 int search_opcode(char *str);
 void make_objectcode(char *file_name);
+void initialize_label(int index);
+void initialize_operand(int index, int start_num);
+void initialize_comment(int index);
