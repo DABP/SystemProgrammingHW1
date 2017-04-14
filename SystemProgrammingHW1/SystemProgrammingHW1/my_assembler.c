@@ -93,7 +93,9 @@ static int assem_pass1(void)
 	for (cnt = 0; cnt < line_num; cnt++) {
 		if (input_data[cnt][0] != '.') {
 			token_table[token_line] = (struct token_unit*)malloc(sizeof(struct token_unit));
-			tok_parsing(cnt);
+			if (tok_parsing(cnt) < 0) {
+				return -1;
+			}
 			token_line++;
 		}
 	}
@@ -269,32 +271,25 @@ int tok_parsing(int index)
 	token_table[token_line]->operator_ = (char *)malloc(strlen(tok) + 1);
 	strcpy_s(token_table[token_line]->operator_, strlen(tok) + 1, tok);
 
-	if ((tok = strtok_s(NULL, "\t", &context)) != NULL) // operand
-		strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
+	if ((tok = strtok_s(NULL, "\t", &context)) != NULL) { // operand
+		int op_idx = search_opcode(token_table[token_line]->operator_);
+		if (op_idx > 0) {
+			if (inst[op_idx]->ops == 0) { // operand 개수가 0개인 instruction 인 경우 comment 에 저장.
+				initialize_operand(token_line, 0);
+				token_table[token_line]->comment = (char *)malloc(strlen(tok) + 1);
+				strcpy_s(token_table[token_line]->comment, strlen(tok) + 1, tok);
+				return 0;
+			}
+			strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
+		}
+	}
 	else {
 		initialize_operand(token_line, 0);
 		initialize_comment(token_line);
 	}
-	/*
-	if (strcmp(token_table[token_line]->operator_, "RSUB") != 0) { // RSUB 이 아닐 때
-		if (strcmp(token_table[token_line]->operator_, "END") == 0) { // END 일 때
-			tok = strtok_s(NULL, "\t", &context);
-			token_table[token_line]->operand[0] = (char *)malloc(strlen(tok) + 1);
-			strcpy_s(token_table[token_line]->operand[0], strlen(tok) + 1, tok);
-			
-			initialize_operand(token_line, 1);
-			initialize_comment(token_line);
-			return 0;
-		}
 
-		
-	}
-	else {
-		operand_tmp[0] = '\0';
-	}
-	*/
 	// comment 초기화 및 대입
-	if ((tok = strtok_s(NULL, "\t", &context)) != NULL) { // comment 가 없을 때,
+	if ((tok = strtok_s(NULL, "\t", &context)) != NULL) { // comment 가 있는 경우
 		token_table[token_line]->comment = (char *)malloc(strlen(tok) + 1);
 		strcpy_s(token_table[token_line]->comment, strlen(tok) + 1, tok);
 	}
@@ -308,7 +303,10 @@ int tok_parsing(int index)
 			token_table[token_line]->operand[0] = (char *)malloc(strlen(operand_tmp) + 1);
 			initialize_operand(token_line, 1);
 			strcpy_s(token_table[token_line]->operand[0], strlen(operand_tmp) + 1, operand_tmp);
-
+			int op_num = search_opcode(token_table[token_line]->operator_);
+			if (inst[op_num]->ops != 1) {
+				return -1;
+			}
 		}
 		else { // operand 의 개수가 2개 이상
 			char *operand_tok = NULL;
@@ -328,24 +326,23 @@ int tok_parsing(int index)
 				}
 				cnt++;
 			}
+
+			int op_num = search_opcode(token_table[token_line]->operator_);
+			if (inst[op_num]->ops == 2) { // ops가 2일때 오류 검출
+				if (strlen(token_table[token_line]->operand[0]) == 0 || strlen(token_table[token_line]->operand[1]) == 0 || strlen(token_table[token_line]->operand[2]) > 0) 
+					return -1;
+				
+			}
+			else if (inst[op_num]->ops == 3) { // ops가 3일때 오류 검출
+				if (strlen(token_table[token_line]->operand[0]) == 0 || strlen(token_table[token_line]->operand[1]) == 0 || strlen(token_table[token_line]->operand[3]) == 0)
+					return -1;
+			}
 		}
 	}
 	else {
-		int cnt = 0;
-		for (cnt = 0; cnt < MAX_OPERAND; cnt++) {
-			token_table[token_line]->operand[cnt] = (char *)malloc(1);
-			token_table[token_line]->operand[cnt][0] = '\0';
-		}
+		initialize_operand(token_line, 0);
 	}
-	int cnt = 0;
-	for (cnt = 0; cnt < MAX_OPERAND; cnt++) {
-		if (token_table[token_line]->operand[cnt][strlen(token_table[token_line]->operand[cnt]) - 1] == '\n')
-			token_table[token_line]->operand[cnt][strlen(token_table[token_line]->operand[cnt]) - 1] = '\0';
-	}
-	if (token_table[token_line]->comment[strlen(token_table[token_line]->comment) - 1] == '\n')
-		token_table[token_line]->comment[strlen(token_table[token_line]->comment) - 1] = '\0';
-
-
+	
 
 	return 0;
 }
