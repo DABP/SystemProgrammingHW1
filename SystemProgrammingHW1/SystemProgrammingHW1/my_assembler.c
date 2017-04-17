@@ -28,7 +28,7 @@
 */
 int main(int args, char *arg[])
 {
-	if (init_my_assembler()< 0)
+	if (init_my_assembler() < 0)
 	{
 		printf("init_my_assembler: 프로그램 초기화에 실패 했습니다.\n");
 		return -1;
@@ -120,7 +120,7 @@ int init_inst_file(char *inst_file)
 					inst_table[inst_index]->format = atoi(tok); // 형식(format) 저장
 				}
 				else if (cnt == 1) {
-					inst_table[inst_index]->opcode= strtoul(tok, NULL, 16);
+					inst_table[inst_index]->opcode = strtoul(tok, NULL, 16);
 				}
 				else if (cnt == 2) {
 					inst_table[inst_index]->operand_num = atoi(tok);
@@ -212,8 +212,8 @@ int token_parsing(int index)
 	if ((tok = strtok_s(NULL, "\t", &context)) != NULL) { // operand
 		int op_idx = search_opcode(token_table[token_line]->operator_);
 		if (strcmp(token_table[token_line]->operator_, "START") == 0 ||
-			strcmp(token_table[token_line]->operator_, "EXTDEF")  == 0||
-			strcmp(token_table[token_line]->operator_, "EXTREF")  == 0||
+			strcmp(token_table[token_line]->operator_, "EXTDEF") == 0 ||
+			strcmp(token_table[token_line]->operator_, "EXTREF") == 0 ||
 			strcmp(token_table[token_line]->operator_, "RESB") == 0 ||
 			strcmp(token_table[token_line]->operator_, "RESW") == 0 ||
 			strcmp(token_table[token_line]->operator_, "BYTE") == 0 ||
@@ -350,24 +350,45 @@ void make_opcode_output(char *file_name)
 			token_line++;
 		}
 	}
-
-	cnt = 0;
-	for (cnt = 0; cnt < token_line; cnt++) {
-		printf("%s\t\t", token_table[cnt]->label);
-		printf("%s\t", token_table[cnt]->operator_);
-		printf("%s", token_table[cnt]->operand[0]);
-		if (strlen(token_table[cnt]->operand[1]) > 0)
-			printf(",");
-		printf("%s", token_table[cnt]->operand[1]);
-		if (strlen(token_table[cnt]->operand[2]) > 0)
-			printf(",");
-		printf("%s\t", token_table[cnt]->operand[2]);
-		int idx = search_opcode(token_table[cnt]->operator_);
-		if (idx > 0)
-			printf("%02X", inst_table[idx]->opcode);
-		printf("\n");
+	file_name = NULL;
+	if (file_name == NULL) {
+		cnt = 0;
+		for (cnt = 0; cnt < token_line; cnt++) {
+			printf("%s\t\t", token_table[cnt]->label);
+			printf("%s\t", token_table[cnt]->operator_);
+			printf("%s", token_table[cnt]->operand[0]);
+			if (strlen(token_table[cnt]->operand[1]) > 0)
+				printf(",");
+			printf("%s", token_table[cnt]->operand[1]);
+			if (strlen(token_table[cnt]->operand[2]) > 0)
+				printf(",");
+			printf("%s\t", token_table[cnt]->operand[2]);
+			int idx = search_opcode(token_table[cnt]->operator_);
+			if (idx > 0)
+				printf("%02X", inst_table[idx]->opcode);
+			printf("\n");
+		}
 	}
-
+	else {
+		FILE *out_fp;
+		fopen_s(&out_fp, file_name, "w");
+		cnt = 0;
+		for (cnt = 0; cnt < token_line; cnt++) {
+			fprintf(out_fp, "%s\t\t", token_table[cnt]->label);
+			fprintf(out_fp, "%s\t", token_table[cnt]->operator_);
+			fprintf(out_fp, "%s", token_table[cnt]->operand[0]);
+			if (strlen(token_table[cnt]->operand[1]) > 0)
+				fprintf(out_fp, ",");
+			fprintf(out_fp, "%s", token_table[cnt]->operand[1]);
+			if (strlen(token_table[cnt]->operand[2]) > 0)
+				fprintf(out_fp, ",");
+			fprintf(out_fp, "%s\t", token_table[cnt]->operand[2]);
+			int idx = search_opcode(token_table[cnt]->operator_);
+			if (idx > 0)
+				fprintf(out_fp, "%02X", inst_table[idx]->opcode);
+			fprintf(out_fp, "\n");
+		}
+	}
 }
 
 
@@ -397,7 +418,7 @@ void make_opcode_output(char *file_name)
 static int assem_pass1(void)
 {
 	/* add your code here */
-	
+
 	return 0;
 }
 
@@ -431,7 +452,7 @@ static int assem_pass2(void)
 void make_objectcode_output(char *file_name)
 {
 	/* add your code here */
-	
+
 }
 
 /* --------------------------------------------------------------------------------*
