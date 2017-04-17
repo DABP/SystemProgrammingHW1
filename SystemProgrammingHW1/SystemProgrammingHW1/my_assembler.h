@@ -4,45 +4,49 @@
 */
 #define MAX_INST 256		// 명령어 최대 개수
 #define MAX_LINES 5000		// 프로그램 코드의 최대 줄 수 
-
-#define MAX_COLUMNS 4		// label, operator, operand, comment
 #define MAX_OPERAND 3		// 한 operator에서 가질 수 있는 operand의 최대 개수
 
 /*
-* 기계어 목록 파일로 부터 정보를 받아와 생성하는 기계어 변환 테이블이다.
-* 해당 기계어의 정보를 토큰으로 나눠 기록하고 있다.
+* instruction 목록 파일로 부터 정보를 받아와서 생성하는 구조체 변수이다.
+* 구조는 각자의 instruction set의 양식에 맞춰 직접 구현하되
+* 라인 별로 하나의 instruction을 저장한다.
 */
-struct inst_struct {
-	char *str;
-	unsigned char op;
+struct inst_unit {
+	/* add your code here */
+	char *name;
+	unsigned char opcode;
 	int format;
-	int ops;
+	int operand_num;
 };
-typedef struct inst_struct inst_struct;
-inst_struct *inst[MAX_INST];
+typedef struct inst_unit inst;
+inst *inst_table[MAX_INST];
 int inst_index;
 
 /*
-* 어셈블리 할 소스코드를 토큰 단위로 관리하는 테이블이다.
-* 관리 정보는 소스 라인 단위로 관리되어진다.
+* 어셈블리 할 소스코드를 입력받는 테이블이다. 라인 단위로 관리할 수 있다.
 */
 char *input_data[MAX_LINES];
 static int line_num;
 
 int label_num;
 
+/*
+* 어셈블리 할 소스코드를 토큰단위로 관리하기 위한 구조체 변수이다.
+* operator는 renaming을 허용한다.
+* nixbpe는 8bit 중 하위 6개의 bit를 이용하여 n,i,x,b,p,e를 표시한다.
+*/
 struct token_unit {
 	char *label;
 	char *operator_;
 	char *operand[MAX_OPERAND];
 	char *comment;
+	//char nixbpe; // 추후 프로젝트에서 사용된다.
+
 };
 
 typedef struct token_unit token;
 token *token_table[MAX_LINES];
 static int token_line;
-
-
 
 /*
 * 심볼을 관리하는 구조체이다.
@@ -61,14 +65,18 @@ static int locctr;
 
 static char *input_file;
 static char *output_file;
-
 int init_my_assembler(void);
-static int assem_pass1(void);
-static int assem_pass2(void);
 int init_inst_file(char *inst_file);
 int init_input_file(char *input_file);
 int search_opcode(char *str);
-void make_objectcode(char *file_name);
+void make_opcode_output(char *file_name);
+int token_parsing(int index);
+/* 추후 프로젝트에서 사용하게 되는 함수*/
+static int assem_pass1(void);
+static int assem_pass2(void);
+void make_objectcode_output(char *file_name);
+
+/* 추가 함수 선언 */
 void initialize_label(int index);
 void initialize_operand(int index, int start_num);
 void initialize_comment(int index);
