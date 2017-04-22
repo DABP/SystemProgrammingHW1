@@ -33,23 +33,21 @@ int main(int args, char *arg[])
 		printf("init_my_assembler: 프로그램 초기화에 실패 했습니다.\n");
 		return -1;
 	}
-	make_opcode_output("output");
+	// make_opcode_output("output");
 
 
-	/*
-	* 추후 프로젝트 1에서 사용되는 부분
-	*
-	if(assem_pass1() < 0 ){
-	printf("assem_pass1: 패스1 과정에서 실패하였습니다.  \n") ;
-	return -1 ;
+
+	if (assem_pass1() < 0) {
+		printf("assem_pass1: Fail.  \n");
+		return -1;
 	}
-	if(assem_pass2() < 0 ){
-	printf(" assem_pass2: 패스2 과정에서 실패하였습니다.  \n") ;
-	return -1 ;
+	if (assem_pass2() < 0) {
+		printf(" assem_pass2: Fail.  \n");
+		return -1;
 	}
 
-	make_objectcode_output("output") ;
-	*/
+	make_objectcode_output("output");
+
 	return 0;
 }
 
@@ -89,9 +87,7 @@ int init_my_assembler(void)
 int init_inst_file(char *inst_file)
 {
 	FILE * file;
-	int errno_ = 0;
 
-	/* add your code here */
 	fopen_s(&file, inst_file, "rb");
 	if (file == NULL) {
 		return -1;
@@ -103,11 +99,9 @@ int init_inst_file(char *inst_file)
 	char str_temp[255];
 
 	while (!feof(file)) {
-
 		fgets(str_temp, sizeof(str_temp), file);
 		tok = NULL;
 		context = NULL;
-
 		int cnt = 0;
 		tok = strtok_s(str_temp, "|", &context); // "|" 문자를 기준으로 tokizing을 한다.
 		inst_table[inst_index] = (struct inst_unit*)malloc(sizeof(struct inst_unit)); // inst 메모리 할당.
@@ -120,18 +114,18 @@ int init_inst_file(char *inst_file)
 					inst_table[inst_index]->format = atoi(tok); // 형식(format) 저장
 				}
 				else if (cnt == 1) {
-					inst_table[inst_index]->opcode = strtoul(tok, NULL, 16);
+					inst_table[inst_index]->opcode = strtoul(tok, NULL, 16); // opcode 저장. 16진수 형태로 변환하여 저장.
 				}
 				else if (cnt == 2) {
-					inst_table[inst_index]->operand_num = atoi(tok);
+					inst_table[inst_index]->operand_num = atoi(tok); // operand 개수 저장.
 				}
 			}
 			cnt++;
 		}
-		inst_index++;
+		inst_index++; // inst_table의 라인 수
 	}
 	fclose(file);
-	return errno_;
+	return 0;
 }
 
 /* ----------------------------------------------------------------------------------
@@ -160,16 +154,16 @@ int init_input_file(char *input_file)
 	char *del;
 
 	while (!feof(file)) {
-		fgets(str_temp, sizeof(str_temp), file);
-		input_data[line_num] = (char *)malloc(strlen(str_temp) + 1);
-		strcpy_s(input_data[line_num], strlen(str_temp) + 1, str_temp);
-		while (del = strchr(input_data[line_num], '\n')) {
+		fgets(str_temp, sizeof(str_temp), file); // 1 line str_temp 에 저장.
+		input_data[line_num] = (char *)malloc(strlen(str_temp) + 1); // str_temp 크기만큼 동적할당.
+		strcpy_s(input_data[line_num], strlen(str_temp) + 1, str_temp); // input_data[index]에 읽어온 1 line 저장.
+		while (del = strchr(input_data[line_num], '\n')) { // 개행('\n')을 없애줌.
 			*del = '\0';
 		}
-		line_num++;
+		line_num++; // input_data 의 라인 수.
 	}
 	fclose(file);
-	return errno_;
+	return 0;
 }
 
 /* ----------------------------------------------------------------------------------
@@ -186,11 +180,19 @@ int token_parsing(int index)
 	char *tok = NULL;
 	char *context = NULL;
 	char operand_tmp[40] = { 0, };
+	int no_operand = 0;		// operand 개수가 0개이면 1.
+	int ltorg_flag = 0;		// 리터럴이 정의되었으면 1. (operator가 "END" or "CSECT"가 나왔는데 0이면 표시)
 
-	tok = strtok_s(input_data[index], "\t", &context);
+	tok = strtok_s(input_data[index], "\t", &context); // label or operator
 
 	// 첫번째가 라벨인 경우 
-	if (search_opcode(tok) < 0 && strcmp(tok, "END") && strcmp(tok, "EXTDEF") && strcmp(tok, "EXTREF") && strcmp(tok, "LTORG") && strcmp(tok, "EQU") && strcmp(tok, "CSECT")) {
+	if (search_opcode(tok) < 0 &&
+		strcmp(tok, "END") &&
+		strcmp(tok, "EXTDEF") &&
+		strcmp(tok, "EXTREF") &&
+		strcmp(tok, "LTORG") &&
+		strcmp(tok, "EQU") &&
+		strcmp(tok, "CSECT")) {
 		if (tok[0] == '+') {
 			initialize_label(token_line);
 		}
@@ -211,6 +213,8 @@ int token_parsing(int index)
 
 	if ((tok = strtok_s(NULL, "\t", &context)) != NULL) { // operand
 		int op_idx = search_opcode(token_table[token_line]->operator_);
+
+		// instruction이 아닌 경우 예외처리. (op_idx가 -1임)
 		if (strcmp(token_table[token_line]->operator_, "START") == 0 ||
 			strcmp(token_table[token_line]->operator_, "EXTDEF") == 0 ||
 			strcmp(token_table[token_line]->operator_, "EXTREF") == 0 ||
@@ -224,17 +228,20 @@ int token_parsing(int index)
 		}
 		else {
 			if (op_idx > 0) {
-				if (inst_table[op_idx]->operand_num == 0) { // operand 개수가 0개인 instruction 인 경우 comment 에 저장.
+				// operand 개수가 0개인 instruction 인 경우 comment 에 저장.
+				if (inst_table[op_idx]->operand_num == 0) {
 					initialize_operand(token_line, 0);
 					token_table[token_line]->comment = (char *)malloc(strlen(tok) + 1);
 					strcpy_s(token_table[token_line]->comment, strlen(tok) + 1, tok);
-					return 0;
+					no_operand = 1;
+					//return 0;
 				}
 				strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
 			}
 		}
 	}
 	else {
+		// operand와 comment가 존재하지 않는 경우 사이즈 0으로 초기화.
 		initialize_operand(token_line, 0);
 		initialize_comment(token_line);
 	}
@@ -245,15 +252,18 @@ int token_parsing(int index)
 		strcpy_s(token_table[token_line]->comment, strlen(tok) + 1, tok);
 	}
 	else {
+		// comment가 존재하지 않는 경우 사이즈 0으로 초기화.
 		initialize_comment(token_line);
 	}
 
 	// operand 초기화 및 대입
-	if (strlen(operand_tmp) > 0) {
+	if (strlen(operand_tmp) > 0 && no_operand == 0) {
 		if (strchr(operand_tmp, ',') == NULL) { // operand의 개수가 1개일 때.
 			token_table[token_line]->operand[0] = (char *)malloc(strlen(operand_tmp) + 1);
 			initialize_operand(token_line, 1);
 			strcpy_s(token_table[token_line]->operand[0], strlen(operand_tmp) + 1, operand_tmp);
+
+			// instruction이 아닌 경우 예외 처리.
 			int op_num = search_opcode(token_table[token_line]->operator_);
 			if (strcmp(token_table[token_line]->operator_, "START") != 0 &&
 				strcmp(token_table[token_line]->operator_, "EXTDEF") != 0 &&
@@ -290,9 +300,51 @@ int token_parsing(int index)
 		}
 	}
 	else {
+		// operand가 0개인 경우 사이즈 0으로 초기화.
 		initialize_operand(token_line, 0);
 	}
 
+	// address 초기화
+	token_table[token_line]->addr = 0;
+	if (strcmp(token_table[token_line]->operator_, "CSECT") == 0)
+		locctr = 0;
+	if (strcmp(token_table[token_line]->operator_, "START") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EXTDEF") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EXTREF") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EQU") != 0 &&
+		strcmp(token_table[token_line]->operator_, "END") != 0 &&
+		strcmp(token_table[token_line]->operator_, "LTORG") != 0 &&
+		strcmp(token_table[token_line]->operator_, "CSECT") != 0
+		) {
+		if (strcmp(token_table[token_line]->operator_, "RESB") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += atoi(token_table[token_line]->operand[0]) * 1;
+		}
+		else if (strcmp(token_table[token_line]->operator_, "RESW") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += atoi(token_table[token_line]->operand[0]) * 3;
+		}
+		else if (strcmp(token_table[token_line]->operator_, "BYTE") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += 1;
+		}
+		else if (strcmp(token_table[token_line]->operator_, "WORD") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += 3;
+		}
+		else {
+			if (token_table[token_line]->operator_[0] == '+') { // 4형식 instruction
+				token_table[token_line]->addr = locctr;
+				locctr += 4;
+			}
+			else { // 1, 2, 3형식 instruction
+				int format = inst_table[search_opcode(token_table[token_line]->operator_)]->format;
+				token_table[token_line]->addr = locctr;
+				locctr += format;
+
+			}
+		}
+	}
 
 	return 0;
 }
@@ -311,8 +363,8 @@ int search_opcode(char *str)
 	int cnt = 0;
 	char tmp[20];
 	int cnt2 = 0;
-	for (cnt = 0; cnt < inst_index; cnt++) {
-		if (str[0] == '+') {
+	for (cnt = 0; cnt < inst_index; cnt++) { // inst_index 까지 검사.
+		if (str[0] == '+') { // Extended인 경우 str[0] 삭제 후 한칸씩 당겨 tmp에 저장.
 			for (cnt2 = 1; cnt2 <= strlen(str); cnt2++) {
 				tmp[cnt2 - 1] = str[cnt2];
 			}
@@ -351,7 +403,7 @@ void make_opcode_output(char *file_name)
 		}
 	}
 	file_name = NULL;
-	if (file_name == NULL) {
+	if (file_name == NULL) { // 파일 이름이 지정되어 있지 않은 경우 console에 출력
 		cnt = 0;
 		for (cnt = 0; cnt < token_line; cnt++) {
 			printf("%s\t\t", token_table[cnt]->label);
@@ -369,24 +421,23 @@ void make_opcode_output(char *file_name)
 			printf("\n");
 		}
 	}
-	else {
-		FILE *out_fp;
-		fopen_s(&out_fp, file_name, "w");
+	else { // 파일 이름이 지정되어 있는 경우 해당 파일에 기록.
+		fopen_s(&output_file, file_name, "w");
 		cnt = 0;
 		for (cnt = 0; cnt < token_line; cnt++) {
-			fprintf(out_fp, "%s\t\t", token_table[cnt]->label);
-			fprintf(out_fp, "%s\t", token_table[cnt]->operator_);
-			fprintf(out_fp, "%s", token_table[cnt]->operand[0]);
+			fprintf(output_file, "%s\t\t", token_table[cnt]->label);
+			fprintf(output_file, "%s\t", token_table[cnt]->operator_);
+			fprintf(output_file, "%s", token_table[cnt]->operand[0]);
 			if (strlen(token_table[cnt]->operand[1]) > 0)
-				fprintf(out_fp, ",");
-			fprintf(out_fp, "%s", token_table[cnt]->operand[1]);
+				fprintf(output_file, ",");
+			fprintf(output_file, "%s", token_table[cnt]->operand[1]);
 			if (strlen(token_table[cnt]->operand[2]) > 0)
-				fprintf(out_fp, ",");
-			fprintf(out_fp, "%s\t", token_table[cnt]->operand[2]);
+				fprintf(output_file, ",");
+			fprintf(output_file, "%s\t", token_table[cnt]->operand[2]);
 			int idx = search_opcode(token_table[cnt]->operator_);
 			if (idx > 0)
-				fprintf(out_fp, "%02X", inst_table[idx]->opcode);
-			fprintf(out_fp, "\n");
+				fprintf(output_file, "%02X", inst_table[idx]->opcode);
+			fprintf(output_file, "\n");
 		}
 	}
 }
@@ -418,6 +469,15 @@ void make_opcode_output(char *file_name)
 static int assem_pass1(void)
 {
 	/* add your code here */
+	int cnt = 0;
+	token_line = 0;
+	for (cnt = 0; cnt < line_num; cnt++) {
+		if (input_data[cnt][0] != '.') {
+			token_table[token_line] = (struct token_unit*)malloc(sizeof(struct token_unit));
+			token_parsing(cnt);
+			token_line++;
+		}
+	}
 
 	return 0;
 }
@@ -436,6 +496,7 @@ static int assem_pass2(void)
 {
 
 	/* add your code here */
+	return 0;
 
 }
 
@@ -452,7 +513,32 @@ static int assem_pass2(void)
 void make_objectcode_output(char *file_name)
 {
 	/* add your code here */
-
+	int cnt = 0;
+	for (cnt = 0; cnt < token_line; cnt++) {
+		if (strcmp(token_table[cnt]->operator_, "START") != 0 &&
+			strcmp(token_table[cnt]->operator_, "EXTDEF") != 0 &&
+			strcmp(token_table[cnt]->operator_, "EXTREF") != 0 &&
+			strcmp(token_table[cnt]->operator_, "EQU") != 0 &&
+			strcmp(token_table[cnt]->operator_, "LTORG") != 0 &&
+			strcmp(token_table[cnt]->operator_, "END") != 0) {
+			printf("%04X\t", token_table[cnt]->addr);
+		}
+		else
+			printf("\t");
+		printf("%s\t\t", token_table[cnt]->label);
+		printf("%s\t", token_table[cnt]->operator_);
+		printf("%s", token_table[cnt]->operand[0]);
+		if (strlen(token_table[cnt]->operand[1]) > 0)
+			printf(",");
+		printf("%s", token_table[cnt]->operand[1]);
+		if (strlen(token_table[cnt]->operand[2]) > 0)
+			printf(",");
+		printf("%s\t", token_table[cnt]->operand[2]);
+		int idx = search_opcode(token_table[cnt]->operator_);
+		if (idx > 0)
+			printf("%02X", inst_table[idx]->opcode);
+		printf("\n");
+	}
 }
 
 /* --------------------------------------------------------------------------------*
