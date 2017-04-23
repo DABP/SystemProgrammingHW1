@@ -303,48 +303,11 @@ int token_parsing(int index)
 		// operand가 0개인 경우 사이즈 0으로 초기화.
 		initialize_operand(token_line, 0);
 	}
-
-	// address 초기화
-	token_table[token_line]->addr = 0;
-	if (strcmp(token_table[token_line]->operator_, "CSECT") == 0)
-		locctr = 0;
-	if (strcmp(token_table[token_line]->operator_, "START") != 0 &&
-		strcmp(token_table[token_line]->operator_, "EXTDEF") != 0 &&
-		strcmp(token_table[token_line]->operator_, "EXTREF") != 0 &&
-		strcmp(token_table[token_line]->operator_, "EQU") != 0 &&
-		strcmp(token_table[token_line]->operator_, "END") != 0 &&
-		strcmp(token_table[token_line]->operator_, "LTORG") != 0 &&
-		strcmp(token_table[token_line]->operator_, "CSECT") != 0
-		) {
-		if (strcmp(token_table[token_line]->operator_, "RESB") == 0) {
-			token_table[token_line]->addr = locctr;
-			locctr += atoi(token_table[token_line]->operand[0]) * 1;
-		}
-		else if (strcmp(token_table[token_line]->operator_, "RESW") == 0) {
-			token_table[token_line]->addr = locctr;
-			locctr += atoi(token_table[token_line]->operand[0]) * 3;
-		}
-		else if (strcmp(token_table[token_line]->operator_, "BYTE") == 0) {
-			token_table[token_line]->addr = locctr;
-			locctr += 1;
-		}
-		else if (strcmp(token_table[token_line]->operator_, "WORD") == 0) {
-			token_table[token_line]->addr = locctr;
-			locctr += 3;
-		}
-		else {
-			if (token_table[token_line]->operator_[0] == '+') { // 4형식 instruction
-				token_table[token_line]->addr = locctr;
-				locctr += 4;
-			}
-			else { // 1, 2, 3형식 instruction
-				int format = inst_table[search_opcode(token_table[token_line]->operator_)]->format;
-				token_table[token_line]->addr = locctr;
-				locctr += format;
-
-			}
-		}
+	
+	if (token_table[token_line]->operand[0][0] == '=') {
+		set_literal(token_table[token_line]->operand[0]);
 	}
+
 
 	return 0;
 }
@@ -471,11 +434,17 @@ static int assem_pass1(void)
 	/* add your code here */
 	int cnt = 0;
 	token_line = 0;
+	literal_num = 0;
 	for (cnt = 0; cnt < line_num; cnt++) {
 		if (input_data[cnt][0] != '.') {
 			token_table[token_line] = (struct token_unit*)malloc(sizeof(struct token_unit));
 			token_parsing(cnt);
+			set_location_counter();
 			token_line++;
+			if ((strcmp(token_table[token_line - 1]->operator_, "LTORG") == 0 || strcmp(token_table[token_line - 1]->operator_, "END") == 0) && literal_num > 0) {
+				token_line += def_literal();
+
+			}
 		}
 	}
 
@@ -583,3 +552,118 @@ void initialize_comment(int index) {
 	token_table[index]->comment = (char *)malloc(sizeof(char));
 	token_table[index]->comment[0] = '\0';
 }
+
+/* -----------------------------------------------------------------------------------
+* 설명 : location counter를 초기화 한다. assem_pass1에서 사용.
+* 매계 : void
+* 반환 : void
+*
+* -----------------------------------------------------------------------------------
+*/
+void set_location_counter() {
+	// address 초기화
+	token_table[token_line]->addr = 0;
+	if (strcmp(token_table[token_line]->operator_, "CSECT") == 0)
+		locctr = 0;
+	if (strcmp(token_table[token_line]->operator_, "START") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EXTDEF") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EXTREF") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EQU") != 0 &&
+		strcmp(token_table[token_line]->operator_, "END") != 0 &&
+		strcmp(token_table[token_line]->operator_, "LTORG") != 0 &&
+		strcmp(token_table[token_line]->operator_, "CSECT") != 0
+		) {
+		if (strcmp(token_table[token_line]->operator_, "RESB") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += atoi(token_table[token_line]->operand[0]) * 1;
+		}
+		else if (strcmp(token_table[token_line]->operator_, "RESW") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += atoi(token_table[token_line]->operand[0]) * 3;
+		}
+		else if (strcmp(token_table[token_line]->operator_, "BYTE") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += 1;
+		}
+		else if (strcmp(token_table[token_line]->operator_, "WORD") == 0) {
+			token_table[token_line]->addr = locctr;
+			locctr += 3;
+		}
+		else {
+			if (token_table[token_line]->operator_[0] == '+') { // 4형식 instruction
+				token_table[token_line]->addr = locctr;
+				locctr += 4;
+			}
+			else { // 1, 2, 3형식 instruction
+				int format = inst_table[search_opcode(token_table[token_line]->operator_)]->format;
+				token_table[token_line]->addr = locctr;
+				locctr += format;
+			}
+		}
+	}
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : tok_parsing중에 리터럴 상수가 나온 경우 literal_pool에 추가한다.
+* 매계 : 리터럴 상수의 이름.
+* 반환 : 없음.
+*
+* -----------------------------------------------------------------------------------
+*/
+void set_literal(char *str) {
+	int cnt = 0;
+	int is_duplicate = 0;
+	for (cnt = 0; cnt < literal_num; cnt++) {
+		if (strcmp(literal_table[cnt]->name, str) == 0) {
+			is_duplicate = 1;
+			return;
+		}
+	}
+	if (is_duplicate == 0) {
+		literal_table[literal_num] = (struct literal_pool*) malloc(sizeof(struct literal_pool));
+		literal_table[literal_num]->name = (char *)malloc(strlen(str) + 1);
+		strcpy_s(literal_table[literal_num]->name, strlen(str) + 1, str);
+		literal_num++;
+	}
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : literal_table 에 있는 리터럴들을 프로그램라인에 추가한다.
+* 매계 : 없음.
+* 반환 : 추가한 라인의 수.
+*
+* -----------------------------------------------------------------------------------
+*/
+int def_literal() {
+	int cnt = 0;
+	int cnt2 = 0;
+	int return_num = 0;
+	for (cnt = token_line, cnt2 = 0; cnt2 < literal_num; cnt++, cnt2++) {
+		token_table[cnt] = (struct token_unit*)malloc(sizeof(struct token_unit));
+		token_table[cnt]->addr = locctr;
+		token_table[cnt]->label = (char *)malloc(sizeof('*') + sizeof('\0'));
+		token_table[cnt]->label[0] = '*';
+		token_table[cnt]->label[1] = '\0';
+		token_table[cnt]->operator_ = (char *)malloc(strlen(literal_table[cnt2]->name) + 1);
+		strcpy_s(token_table[cnt]->operator_, strlen(literal_table[cnt2]->name) + 1, literal_table[cnt2]->name);
+		if (token_table[cnt]->operator_[1] == 'C') {
+			locctr += (strlen(token_table[cnt]->operator_) - 4);
+		}
+		else if (token_table[cnt]->operator_[1] == 'X') {
+			locctr += ((strlen(token_table[cnt]->operator_) - 4) / 2);
+		}
+		initialize_operand(cnt, 0);
+		initialize_comment(cnt);
+	}
+	return_num = literal_num;
+	literal_num = 0;			// 리터럴 개수 초기화.
+	return return_num;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 :
+* 매계 :
+* 반환 :
+*
+* -----------------------------------------------------------------------------------
+*/

@@ -60,6 +60,16 @@ struct symbol_unit {		// 심볼을 관리한다.
 typedef struct symbol_unit symbol;	// symbol로 재정의.
 symbol sym_table[MAX_LINES];		// sym_table을 생성.
 
+/*
+* 리터럴 상수를 임시로 저장하고 있는 테이블이다.
+*/
+struct literal_pool {
+	char *name;
+};
+typedef struct literal_pool literal_p;	
+literal_p *literal_table[MAX_LINES];		// literal_table 생성.
+int literal_num;						// literal_table row counter
+
 static int locctr;		// LOCATION COUNTER
 //--------------
 
@@ -80,3 +90,6 @@ void make_objectcode_output(char *file_name);
 void initialize_label(int index);					// label을 최소사이즈로 초기화
 void initialize_operand(int index, int start_num);	// operand를 최소 사이즈로 각각 초기화
 void initialize_comment(int index);					// comment를 최소 사이즈로 초기화
+void set_location_counter();						// 라인별 location counter 초기화
+void set_literal(char* str);									// literal line 생성.
+int def_literal();
