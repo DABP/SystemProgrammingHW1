@@ -435,6 +435,7 @@ static int assem_pass1(void)
 	int cnt = 0;
 	token_line = 0;
 	literal_num = 0;
+	sym_num = 0;
 	for (cnt = 0; cnt < line_num; cnt++) {
 		if (input_data[cnt][0] != '.') {
 			token_table[token_line] = (struct token_unit*)malloc(sizeof(struct token_unit));
@@ -443,7 +444,14 @@ static int assem_pass1(void)
 			token_line++;
 			if ((strcmp(token_table[token_line - 1]->operator_, "LTORG") == 0 || strcmp(token_table[token_line - 1]->operator_, "END") == 0) && literal_num > 0) {
 				token_line += def_literal();
-
+			}
+			else if (strcmp(token_table[token_line - 1]->operator_, "START") == 0) {
+				add_symbol(token_table[token_line - 1]->operand[0], token_table[token_line - 1]->label, token_table[token_line - 1]->label);
+			}
+			else if (strcmp(token_table[token_line - 1]->operator_, "EXTDEF") == 0) {
+				int cnt2 = 0;
+				for(cnt2 = 0; cnt2 < MAX_OPERAND; cnt2++)
+				add_symbol(token_table[token_line - 1]->addr, token_table[token_line - 1]->operand[cnt2], token_table[token_line - 1]->)
 			}
 		}
 	}
@@ -511,7 +519,7 @@ void make_objectcode_output(char *file_name)
 }
 
 /* --------------------------------------------------------------------------------*
-* ------------------------------ 추가로 제작한 함수 -------------------------------*
+* ------------------------------ 추가로 구현한 함수 -------------------------------*
 * --------------------------------------------------------------------------------*/
 
 /* -----------------------------------------------------------------------------------
@@ -658,6 +666,20 @@ int def_literal() {
 	return_num = literal_num;
 	literal_num = 0;			// 리터럴 개수 초기화.
 	return return_num;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : sym_table에 심볼 추가.
+* 매계 : 심볼의 주소, 심볼 이름, 심볼이 속해있는 섹션 이름.
+* 반환 : void
+*
+* -----------------------------------------------------------------------------------
+*/
+void add_symbol(int address, char *name, char *section) {
+	sym_table[sym_num] = (struct symbol_unit*)malloc(sizeof(struct symbol_unit));
+	sym_table[sym_num]->addr = address;
+	strcpy_s(sym_table[sym_num]->symbol, strlen(name) + 1, name);
+	strcpy_s(sym_table[sym_num]->section, strlen(section) + 1, section);
 }
 
 /* -----------------------------------------------------------------------------------
