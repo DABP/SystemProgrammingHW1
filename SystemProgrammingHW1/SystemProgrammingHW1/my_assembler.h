@@ -40,8 +40,8 @@ struct token_unit {				// input_data에 라인 단위로 저장된 소스코드를 파싱하여 저
 	char *operator_;			// operator 저장 (예약어, instruction)
 	char *operand[MAX_OPERAND];	// operand 저장 (인덱스는 0부터 2까지 총 3개 가능하다.)
 	char *comment;				// comment 저장.
-	int obcode;
-	//char nixbpe; // 추후 프로젝트에서 사용된다.
+	unsigned int obcode;
+	char nixbpe; // 추후 프로젝트에서 사용된다.
 };
 
 typedef struct token_unit token;	// token으로 재정의.

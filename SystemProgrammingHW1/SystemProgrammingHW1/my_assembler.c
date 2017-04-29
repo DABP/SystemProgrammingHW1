@@ -227,7 +227,7 @@ int token_parsing(int index)
 			strcpy_s(operand_tmp, strlen(tok) + 1, tok); // operand 임시 저장.
 		}
 		else {
-			if (op_idx > 0) {
+			if (op_idx >= 0) {
 				// operand 개수가 0개인 instruction 인 경우 comment 에 저장.
 				if (inst_table[op_idx]->operand_num == 0) {
 					initialize_operand(token_line, 0);
@@ -379,7 +379,7 @@ void make_opcode_output(char *file_name)
 				printf(",");
 			printf("%s\t", token_table[cnt]->operand[2]);
 			int idx = search_opcode(token_table[cnt]->operator_);
-			if (idx > 0)
+			if (idx >= 0)
 				printf("%02X", inst_table[idx]->opcode);
 			printf("\n");
 		}
@@ -398,7 +398,7 @@ void make_opcode_output(char *file_name)
 				fprintf(output_file, ",");
 			fprintf(output_file, "%s\t", token_table[cnt]->operand[2]);
 			int idx = search_opcode(token_table[cnt]->operator_);
-			if (idx > 0)
+			if (idx >= 0)
 				fprintf(output_file, "%02X", inst_table[idx]->opcode);
 			fprintf(output_file, "\n");
 		}
@@ -487,10 +487,147 @@ static int assem_pass1(void)
 */
 static int assem_pass2(void)
 {
-
 	/* add your code here */
-	return 0;
+	int cnt = 0;
+	for (cnt = 0; cnt < token_line; cnt++) {
+		/*if (strcmp(token_table[cnt], "START") != 0 &&
+			strcmp(token_table[cnt], "EXTDEF") != 0 &&
+			strcmp(token_table[cnt], "EXTREF") != 0 &&
+			strcmp(token_table[cnt], "RESW") != 0 &&
+			strcmp(token_table[cnt], "RESB") != 0 &&
+			strcmp(token_table[cnt], "BYTE") != 0 &&
+			strcmp(token_table[cnt], "WORD") != 0 &&
+			strcmp(token_table[cnt], "CSECT") != 0 &&
+			strcmp(token_table[cnt], "LTORG") != 0 &&
+			strcmp(token_table[cnt], "EQU") != 0 &&
+			strcmp(token_table[cnt], "") != 0 && ) {
 
+		}*/
+		int op_idx = 0;
+		int obcode = 0;
+		int format = 0;
+		if (strcmp(token_table[cnt]->operator_, "START") == 0 || strcmp(token_table[cnt]->operator_, "CSECT") == 0) {
+			strcpy_s(now_section, strlen(token_table[cnt]->label) + 1, token_table[cnt]->label);
+		}
+		else if (token_table[cnt]->operator_[0] == '=') { // literal
+			if (token_table[cnt]->operator_[1] == 'C') {
+				if (('A' <= token_table[cnt]->operator_[3] && token_table[cnt]->operator_[3] <= 'Z') || 
+					('a' <= token_table[cnt]->operator_[3] && token_table[cnt]->operator_[3] <= 'z')) {
+					token_table[cnt]->obcode = token_table[cnt]->operator_[3] << 16;
+					if (('A' <= token_table[cnt]->operator_[4] && token_table[cnt]->operator_[4] <= 'Z') ||
+						('a' <= token_table[cnt]->operator_[4] && token_table[cnt]->operator_[4] <= 'z')) {
+						token_table[cnt]->obcode += token_table[cnt]->operator_[4] << 8;
+						if (('A' <= token_table[cnt]->operator_[5] && token_table[cnt]->operator_[5] <= 'Z') ||
+							('a' <= token_table[cnt]->operator_[5] && token_table[cnt]->operator_[5] <= 'z')) {
+							token_table[cnt]->obcode += token_table[cnt]->operator_[5];
+						}
+					}
+				}
+			}
+			else if (token_table[cnt]->operator_[1] == 'X') {
+				char tmp[10];
+				strcpy_s(tmp, strlen(token_table[cnt]->operator_) + 1, token_table[cnt]->operator_);
+				tmp[strlen(tmp) - 1] = '\0';
+				token_table[cnt]->obcode = atoi(&tmp[3]);
+			}
+		}
+		op_idx = search_opcode(token_table[cnt]->operator_);
+		if (op_idx >= 0) {
+			format = inst_table[op_idx]->format;
+			if (format == 3) {
+				if (token_table[cnt]->operator_[0] == '+')
+					format = 4;
+			}
+			obcode = (int)(inst_table[op_idx]->opcode) << (format * 8 - 8);
+
+			if (format == 3 || format == 4) {
+				if (token_table[cnt]->operand[0][0] == '#') { // immediate
+					obcode += 1 << format * 8 - 8;
+					obcode += atoi(&(token_table[cnt]->operand[0][1]));
+				}
+				else {
+					if (token_table[cnt]->operand[0][0] == '@') {// indirect
+						obcode += 2 << format * 8 - 8;
+					}
+					else { // simple addressing
+						obcode += 3 << format * 8 - 8;
+					}
+					int cnt2 = 0;
+					// x
+					for (cnt2 = 0; cnt2 < MAX_OPERAND; cnt2++) {
+						if (strcmp(token_table[cnt]->operand[cnt2], "X") == 0) { // use X register
+							obcode += 1 << format * 8 - 9;
+						}
+					}
+					if (format == 3) {
+						// b
+						if (strcmp(token_table[cnt]->operator_, "LDB") == 0 ||
+							strcmp(token_table[cnt]->operator_, "STB") == 0) {
+							obcode += 1 << format * 8 - 10;
+						}
+						// p
+						else if (strlen(token_table[cnt]->operand[0]) > 0) {
+							obcode += 1 << format * 8 - 11;
+						}
+					}
+					// e
+					else {
+						obcode += 1 << format * 8 - 12;
+					}
+					// display
+					if (format == 3) {
+
+						int sym_idx = search_symbol(token_table[cnt]->operand[0], now_section);
+						if (sym_idx >= 0) {
+							int tmp = 0;
+							tmp = (sym_table[sym_idx]->addr) - (token_table[cnt + 1]->addr);
+							if (tmp < 0) { // 0보다 작아지는 경우.
+								tmp = 0x0FFF & tmp;
+							}
+							obcode += tmp;
+						}
+						else if (token_table[cnt]->operand[0][0] == '=') { // literal
+							int cnt2 = 0;
+							int tmp = 0;
+							for (cnt2 = 0; cnt2 < token_line; cnt2++) {
+								if (strcmp(token_table[cnt]->operand[0], token_table[cnt2]->operator_) == 0) {
+									tmp = (token_table[cnt2]->addr) - (token_table[cnt + 1]->addr);
+									if (tmp < 0) {
+										tmp = 0x0FFF & tmp;
+									}
+									obcode += tmp;
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+			else if (format == 2) {
+				int cnt2 = 0;
+				for (cnt2 = 0; cnt2 < inst_table[op_idx]->operand_num; cnt2++) {
+					if (strlen(token_table[cnt]->operand[cnt2]) > 0) {
+						int register_num = 0;
+						if (cnt2 == 0) {
+							register_num = get_register_num(token_table[cnt]->operand[cnt2]);
+							if (register_num >= 0) {
+								obcode += register_num << 4;
+							}
+						}
+						else if (cnt2 == 1) {
+							register_num = get_register_num(token_table[cnt]->operand[cnt2]);
+							if (register_num >= 0) {
+								obcode += register_num;
+							}
+						}
+					}
+				}
+			}
+			token_table[cnt]->obcode = obcode;
+
+		}
+	}
+	return 0;
 }
 
 /* ----------------------------------------------------------------------------------
@@ -530,8 +667,11 @@ void make_objectcode_output(char *file_name)
 			printf(",");
 		printf("%s\t", token_table[cnt]->operand[2]);
 		int idx = search_opcode(token_table[cnt]->operator_);
-		if (idx > 0)
-			printf("%02X", inst_table[idx]->opcode);
+		if (idx >= 0)
+			printf("%X", token_table[cnt]->obcode);
+		else if (token_table[cnt]->operator_[0] == '=') {
+			printf("%X", token_table[cnt]->obcode);
+		}
 		printf("\n");
 	}
 	printf("\n\n");
@@ -822,6 +962,47 @@ int able_to_use_ref(char *section, char *extref_symbol) {
 		}
 	}
 	return 0;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 :
+* 매계 :
+* 반환 :
+*
+* -----------------------------------------------------------------------------------
+*/
+
+int get_register_num(char *name) {
+	if (strcmp(name, "A") == 0) {
+		return 0;
+	}
+	else if (strcmp(name, "X") == 0) {
+		return 1;
+	}
+	else if (strcmp(name, "L") == 0) {
+		return 2;
+	}
+	else if (strcmp(name, "B") == 0) {
+		return 3;
+	}
+	else if (strcmp(name, "S") == 0) {
+		return 4;
+	}
+	else if (strcmp(name, "T") == 0) {
+		return 5;
+	}
+	else if (strcmp(name, "F") == 0) {
+		return 6;
+	}
+	else if (strcmp(name, "PC") == 0) {
+		return 8;
+	}
+	else if (strcmp(name, "SW") == 0) {
+		return 9;
+	}
+	else {
+		return -1;
+	}
 }
 
 /* -----------------------------------------------------------------------------------
