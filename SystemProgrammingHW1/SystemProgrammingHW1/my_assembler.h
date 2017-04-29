@@ -98,3 +98,4 @@ int def_literal();
 void add_symbol(int, char *, char *);
 int get_calculated_operand(int line, char* section);
 int search_symbol(char *name, char *section);
+int get_register_num(char *name);
