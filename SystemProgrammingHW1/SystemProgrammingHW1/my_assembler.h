@@ -61,6 +61,7 @@ struct symbol_unit {		// 심볼을 관리한다.
 typedef struct symbol_unit symbol;	// symbol로 재정의.
 symbol *sym_table[MAX_LINES];		// sym_table을 생성.
 int sym_num;						// sym_table의 라인 수.
+char now_section[10];				// 현재 섹션 이름.
 /*
 * 리터럴 상수를 임시로 저장하고 있는 테이블이다.
 */
@@ -95,3 +96,5 @@ void set_location_counter();						// 라인별 location counter 초기화
 void set_literal(char* str);						// literal line 생성.
 int def_literal();
 void add_symbol(int, char *, char *);
+int get_calculated_operand(int line, char* section);
+int search_symbol(char *name, char *section);

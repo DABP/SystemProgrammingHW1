@@ -303,7 +303,7 @@ int token_parsing(int index)
 		// operand가 0개인 경우 사이즈 0으로 초기화.
 		initialize_operand(token_line, 0);
 	}
-	
+
 	if (token_table[token_line]->operand[0][0] == '=') {
 		set_literal(token_table[token_line]->operand[0]);
 	}
@@ -436,6 +436,7 @@ static int assem_pass1(void)
 	token_line = 0;
 	literal_num = 0;
 	sym_num = 0;
+
 	for (cnt = 0; cnt < line_num; cnt++) {
 		if (input_data[cnt][0] != '.') {
 			token_table[token_line] = (struct token_unit*)malloc(sizeof(struct token_unit));
@@ -447,11 +448,26 @@ static int assem_pass1(void)
 			}
 			else if (strcmp(token_table[token_line - 1]->operator_, "START") == 0) {
 				add_symbol(token_table[token_line - 1]->operand[0], token_table[token_line - 1]->label, token_table[token_line - 1]->label);
+				strcpy_s(now_section, strlen(token_table[token_line - 1]->label) + 1, token_table[token_line - 1]->label);
 			}
 			else if (strcmp(token_table[token_line - 1]->operator_, "EXTDEF") == 0) {
 				int cnt2 = 0;
-				for(cnt2 = 0; cnt2 < MAX_OPERAND; cnt2++)
-				add_symbol(token_table[token_line - 1]->addr, token_table[token_line - 1]->operand[cnt2], token_table[token_line - 1]->)
+				for (cnt2 = 0; (cnt2 < MAX_OPERAND) && (strlen(token_table[token_line - 1]->operand[cnt2]) > 0); cnt2++)
+					add_symbol(0, token_table[token_line - 1]->operand[cnt2], now_section);
+			}
+			else if (strcmp(token_table[token_line - 1]->operator_, "EXTREF") == 0) {
+				int cnt2 = 0;
+				for (cnt2 = 0; (cnt2 < MAX_OPERAND) && (strlen(token_table[token_line - 1]->operand[cnt2]) > 0); cnt2++)
+					add_symbol(0, token_table[token_line - 1]->operand[cnt2], now_section);
+			}
+			else if (strcmp(token_table[token_line - 1]->operator_, "CSECT") == 0) {
+				strcpy_s(now_section, strlen(token_table[token_line - 1]->label) + 1, token_table[token_line - 1]->label);
+			}
+			else {
+				// symbol 추가.
+				if (strlen(token_table[token_line - 1]->label) > 0) {
+					add_symbol(token_table[token_line - 1]->addr, token_table[token_line - 1]->label, now_section);
+				}
 			}
 		}
 	}
@@ -492,11 +508,13 @@ void make_objectcode_output(char *file_name)
 	/* add your code here */
 	int cnt = 0;
 	for (cnt = 0; cnt < token_line; cnt++) {
+		if (strcmp(token_table[cnt]->operator_, "CSECT") == 0)
+			printf("\n");
 		if (strcmp(token_table[cnt]->operator_, "START") != 0 &&
 			strcmp(token_table[cnt]->operator_, "EXTDEF") != 0 &&
 			strcmp(token_table[cnt]->operator_, "EXTREF") != 0 &&
-			strcmp(token_table[cnt]->operator_, "EQU") != 0 &&
 			strcmp(token_table[cnt]->operator_, "LTORG") != 0 &&
+			strcmp(token_table[cnt]->operator_, "CSECT") != 0 &&
 			strcmp(token_table[cnt]->operator_, "END") != 0) {
 			printf("%04X\t", token_table[cnt]->addr);
 		}
@@ -516,6 +534,8 @@ void make_objectcode_output(char *file_name)
 			printf("%02X", inst_table[idx]->opcode);
 		printf("\n");
 	}
+	printf("\n\n");
+	return;
 }
 
 /* --------------------------------------------------------------------------------*
@@ -576,9 +596,9 @@ void set_location_counter() {
 	if (strcmp(token_table[token_line]->operator_, "START") != 0 &&
 		strcmp(token_table[token_line]->operator_, "EXTDEF") != 0 &&
 		strcmp(token_table[token_line]->operator_, "EXTREF") != 0 &&
-		strcmp(token_table[token_line]->operator_, "EQU") != 0 &&
 		strcmp(token_table[token_line]->operator_, "END") != 0 &&
 		strcmp(token_table[token_line]->operator_, "LTORG") != 0 &&
+		strcmp(token_table[token_line]->operator_, "EQU") != 0 &&
 		strcmp(token_table[token_line]->operator_, "CSECT") != 0
 		) {
 		if (strcmp(token_table[token_line]->operator_, "RESB") == 0) {
@@ -606,6 +626,17 @@ void set_location_counter() {
 				int format = inst_table[search_opcode(token_table[token_line]->operator_)]->format;
 				token_table[token_line]->addr = locctr;
 				locctr += format;
+			}
+		}
+	}
+	else if (strcmp(token_table[token_line]->operator_, "EQU") == 0) {
+		if (strcmp(token_table[token_line]->operand[0], "*") == 0) {
+			token_table[token_line]->addr = locctr;
+		}
+		else {
+			int answer = get_calculated_operand(token_line, now_section);
+			if (answer > 0) {
+				token_table[token_line]->addr = answer;
 			}
 		}
 	}
@@ -676,10 +707,121 @@ int def_literal() {
 * -----------------------------------------------------------------------------------
 */
 void add_symbol(int address, char *name, char *section) {
+	int cnt = 0;
+
+	// 같은 섹션에 같은 심볼이름이 들어오는 경우 address 수정. 
+	for (cnt = 0; cnt < sym_num; cnt++) {
+		if (strcmp(sym_table[cnt]->symbol, name) == 0)
+			if (strcmp(sym_table[cnt]->section, section) == 0) {
+				sym_table[cnt]->addr = address;
+				return;
+			}
+	}
+
+
 	sym_table[sym_num] = (struct symbol_unit*)malloc(sizeof(struct symbol_unit));
 	sym_table[sym_num]->addr = address;
 	strcpy_s(sym_table[sym_num]->symbol, strlen(name) + 1, name);
 	strcpy_s(sym_table[sym_num]->section, strlen(section) + 1, section);
+	sym_num++;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 오퍼런드에 수식이 있는 경우 계산하는 함수.
+* 매계 : token_table의 인덱스, 현재 섹션
+* 반환 : 계산된 값.
+*
+* -----------------------------------------------------------------------------------
+*/
+int get_calculated_operand(int line, char* section) {
+	int cnt = 0;
+	for (cnt = 0; (cnt < MAX_OPERAND) && (strlen(token_table[line]->operand[cnt]) > 0); cnt++) {
+		char *op = 0;
+		char cpy_str[20];
+		char first_symbol[10];
+		char second_symbol[10];
+		strcpy_s(cpy_str, strlen(token_table[line]->operand[cnt]) + 1, token_table[line]->operand[cnt]);
+		if (op = strchr(cpy_str, '+')) {
+			strcpy_s(second_symbol, strlen(op), op + 1);
+			*op = '\0';
+			strcpy_s(first_symbol, strlen(cpy_str) + 1, cpy_str);
+			return (sym_table[search_symbol(first_symbol, section)]->addr) + (sym_table[search_symbol(second_symbol, section)]->addr);
+		}
+		else if (op = strchr(cpy_str, '-')) {
+			strcpy_s(second_symbol, strlen(op), op + 1);
+			*op = '\0';
+			strcpy_s(first_symbol, strlen(cpy_str) + 1, cpy_str);
+			return (sym_table[search_symbol(first_symbol, section)]->addr) - (sym_table[search_symbol(second_symbol, section)]->addr);
+		}
+		else if (op = strchr(cpy_str, '*')) {
+			strcpy_s(second_symbol, strlen(op), op + 1);
+			*op = '\0';
+			strcpy_s(first_symbol, strlen(cpy_str) + 1, cpy_str);
+			return (sym_table[search_symbol(first_symbol, section)]->addr) * (sym_table[search_symbol(second_symbol, section)]->addr);
+		}
+		else if (op = strchr(cpy_str, '/')) {
+			strcpy_s(second_symbol, strlen(op), op + 1);
+			*op = '\0';
+			strcpy_s(first_symbol, strlen(cpy_str) + 1, cpy_str);
+			return (sym_table[search_symbol(first_symbol, section)]->addr) / (sym_table[search_symbol(second_symbol, section)]->addr);
+		}
+		else if (op = strchr(cpy_str, '%')) {
+			strcpy_s(second_symbol, strlen(op), op + 1);
+			*op = '\0';
+			strcpy_s(first_symbol, strlen(cpy_str) + 1, cpy_str);
+			return (sym_table[search_symbol(first_symbol, section)]->addr) % (sym_table[search_symbol(second_symbol, section)]->addr);
+		}
+	}
+	return -1;
+}
+/* -----------------------------------------------------------------------------------
+* 설명 : 심볼 테이블에서 심볼을 검색하는 함수.
+* 매계 : 심볼이름, 검색할 섹션이름
+* 반환 : 해당 심볼이 없다면 -1, 있다면 해당 심볼의 테이블 인덱스.
+*
+* -----------------------------------------------------------------------------------
+*/
+
+int search_symbol(char *name, char *section) {
+	int cnt = 0;
+	for (cnt = 0; cnt < sym_num; cnt++) {
+		if (strcmp(name, sym_table[cnt]->symbol) == 0 && strcmp(section, sym_table[cnt]->section) == 0) {
+			return cnt;
+		}
+	}
+	return -1;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 해당 섹션에서 해당 외부 참조 변수를 사용할 수 있는지 검사.
+* 매계 : 섹션이름과 심볼이름.
+* 반환 : 가능하다면 1, 불가능은 0
+*
+* -----------------------------------------------------------------------------------
+*/
+int able_to_use_ref(char *section, char *extref_symbol) {
+	int cnt = 0;
+	for (cnt = 0; cnt < token_line; cnt++) {
+		if (strcmp(token_table[cnt]->operator_, "START") == 0 || strcmp(token_table[cnt]->operator_, "CSECT") == 0) {
+			if (strcmp(token_table[cnt]->label, section) == 0) {
+				int cnt2 = 0;
+				for (cnt2 = cnt; cnt2 < MAX_LINES; cnt2++) {
+					if (strcmp(token_table[cnt2]->operator_, "EXTREF") == 0) {
+						int cnt3 = 0;
+						for (cnt3 = 0; cnt3 < MAX_OPERAND; cnt3++)
+							if (strcmp(token_table[cnt2]->operand[cnt3], extref_symbol) == 0)
+								return 1;
+
+					}
+					else if (strcmp(token_table[cnt2]->operator_, "CSECT") == 0) {
+						return 0;
+					}
+				}
+				return 0;
+			}
+		}
+	}
+	return 0;
 }
 
 /* -----------------------------------------------------------------------------------
