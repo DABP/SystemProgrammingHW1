@@ -490,45 +490,169 @@ static int assem_pass2(void)
 	/* add your code here */
 	int cnt = 0;
 	for (cnt = 0; cnt < token_line; cnt++) {
-		/*if (strcmp(token_table[cnt], "START") != 0 &&
-			strcmp(token_table[cnt], "EXTDEF") != 0 &&
-			strcmp(token_table[cnt], "EXTREF") != 0 &&
-			strcmp(token_table[cnt], "RESW") != 0 &&
-			strcmp(token_table[cnt], "RESB") != 0 &&
-			strcmp(token_table[cnt], "BYTE") != 0 &&
-			strcmp(token_table[cnt], "WORD") != 0 &&
-			strcmp(token_table[cnt], "CSECT") != 0 &&
-			strcmp(token_table[cnt], "LTORG") != 0 &&
-			strcmp(token_table[cnt], "EQU") != 0 &&
-			strcmp(token_table[cnt], "") != 0 && ) {
-
-		}*/
 		int op_idx = 0;
 		int obcode = 0;
 		int format = 0;
+		token_table[cnt]->obcode = NULL;
 		if (strcmp(token_table[cnt]->operator_, "START") == 0 || strcmp(token_table[cnt]->operator_, "CSECT") == 0) {
 			strcpy_s(now_section, strlen(token_table[cnt]->label) + 1, token_table[cnt]->label);
 		}
 		else if (token_table[cnt]->operator_[0] == '=') { // literal
 			if (token_table[cnt]->operator_[1] == 'C') {
-				if (('A' <= token_table[cnt]->operator_[3] && token_table[cnt]->operator_[3] <= 'Z') || 
+				if (('A' <= token_table[cnt]->operator_[3] && token_table[cnt]->operator_[3] <= 'Z') ||
 					('a' <= token_table[cnt]->operator_[3] && token_table[cnt]->operator_[3] <= 'z')) {
-					token_table[cnt]->obcode = token_table[cnt]->operator_[3] << 16;
+					obcode = token_table[cnt]->operator_[3] << 16;
 					if (('A' <= token_table[cnt]->operator_[4] && token_table[cnt]->operator_[4] <= 'Z') ||
 						('a' <= token_table[cnt]->operator_[4] && token_table[cnt]->operator_[4] <= 'z')) {
-						token_table[cnt]->obcode += token_table[cnt]->operator_[4] << 8;
+						obcode += token_table[cnt]->operator_[4] << 8;
 						if (('A' <= token_table[cnt]->operator_[5] && token_table[cnt]->operator_[5] <= 'Z') ||
 							('a' <= token_table[cnt]->operator_[5] && token_table[cnt]->operator_[5] <= 'z')) {
-							token_table[cnt]->obcode += token_table[cnt]->operator_[5];
+							obcode += token_table[cnt]->operator_[5];
 						}
 					}
 				}
+				char tmp[7];
+				sprintf_s(tmp, 7, "%X", obcode);
+				token_table[cnt]->obcode = (char *)malloc(strlen(tmp) + 1);
+				strcpy_s(token_table[cnt]->obcode, strlen(tmp) + 1, tmp);
 			}
 			else if (token_table[cnt]->operator_[1] == 'X') {
 				char tmp[10];
 				strcpy_s(tmp, strlen(token_table[cnt]->operator_) + 1, token_table[cnt]->operator_);
 				tmp[strlen(tmp) - 1] = '\0';
-				token_table[cnt]->obcode = atoi(&tmp[3]);
+
+				token_table[cnt]->obcode = (char *)malloc(strlen(&tmp[3]) + 1);
+				strcpy_s(token_table[cnt]->obcode, strlen(&tmp[3]) + 1, &tmp[3]);
+			}
+
+		}
+		else if (strcmp(token_table[cnt]->operator_, "BYTE") == 0 || strcmp(token_table[cnt]->operator_, "WORD") == 0) {
+			int len = 0;
+			if (strcmp(token_table[cnt]->operator_, "BYTE") == 0)
+				len = 2;
+			else if (strcmp(token_table[cnt]->operator_, "WORD") == 0)
+				len = 6;
+
+			if (strchr(token_table[cnt]->operand[0], '\'') != NULL) {
+				char tmp[10];
+				strcpy_s(tmp, strlen(token_table[cnt]->operand[0]) + 1, token_table[cnt]->operand[0]);
+				tmp[strlen(tmp) - 1] = '\0';
+
+				token_table[cnt]->obcode = (char *)malloc(len + 1);
+				strcpy_s(token_table[cnt]->obcode, len + 1, &tmp[2]);
+			}
+			else if (strchr(token_table[cnt]->operand[0], '+') != NULL) {
+				char cpy[20];
+				strcpy_s(cpy, strlen(token_table[cnt]->operand[0]) + 1, token_table[cnt]->operand[0]);
+				char *deli = strchr(cpy, '+');
+				char sym1[10];
+				char sym2[10];
+				*deli = '\0';
+
+				strcpy_s(sym2, strlen(deli + 1) + 1, deli + 1);
+				strcpy_s(sym1, strlen(cpy) + 1, cpy);
+
+				int sym1_idx = search_symbol(sym1, now_section);
+				int sym2_idx = search_symbol(sym2, now_section);
+
+				int tmp = 0;
+				tmp = (sym_table[sym1_idx]->addr) + (sym_table[sym2_idx]->addr);
+				if (tmp < 0) { // 0보다 작아지는 경우.
+					tmp = 0x0FFF & tmp;
+				}
+				token_table[cnt]->obcode = (char *)malloc(len + 1);
+				sprintf_s(token_table[cnt]->obcode, len + 1, "%0*X", len, tmp);
+			}
+			else if (strchr(token_table[cnt]->operand[0], '-') != NULL) {
+				char cpy[20];
+				strcpy_s(cpy, strlen(token_table[cnt]->operand[0]) + 1, token_table[cnt]->operand[0]);
+				char *deli = strchr(cpy, '-');
+				char sym1[10];
+				char sym2[10];
+				*deli = '\0';
+
+				strcpy_s(sym2, strlen(deli + 1) + 1, deli + 1);
+				strcpy_s(sym1, strlen(cpy) + 1, cpy);
+
+				int sym1_idx = search_symbol(sym1, now_section);
+				int sym2_idx = search_symbol(sym2, now_section);
+
+				int tmp = 0;
+				tmp = (sym_table[sym1_idx]->addr) - (sym_table[sym2_idx]->addr);
+				if (tmp < 0) { // 0보다 작아지는 경우.
+					tmp = 0x0FFF & tmp;
+				}
+				token_table[cnt]->obcode = (char *)malloc(len + 1);
+				sprintf_s(token_table[cnt]->obcode, len + 1, "%0*X", len, tmp);
+			}
+			else if (strchr(token_table[cnt]->operand[0], '*') != NULL) {
+				char cpy[20];
+				strcpy_s(cpy, strlen(token_table[cnt]->operand[0]) + 1, token_table[cnt]->operand[0]);
+				char *deli = strchr(cpy, '*');
+				char sym1[10];
+				char sym2[10];
+				*deli = '\0';
+
+				strcpy_s(sym2, strlen(deli + 1) + 1, deli + 1);
+				strcpy_s(sym1, strlen(cpy) + 1, cpy);
+
+				int sym1_idx = search_symbol(sym1, now_section);
+				int sym2_idx = search_symbol(sym2, now_section);
+
+				int tmp = 0;
+				tmp = (sym_table[sym1_idx]->addr) * (sym_table[sym2_idx]->addr);
+				if (tmp < 0) { // 0보다 작아지는 경우.
+					tmp = 0x0FFF & tmp;
+				}
+				token_table[cnt]->obcode = (char *)malloc(len + 1);
+				sprintf_s(token_table[cnt]->obcode, len + 1, "%0*X", len, tmp);
+			}
+			else if (strchr(token_table[cnt]->operand[0], '/') != NULL) {
+				char cpy[20];
+				strcpy_s(cpy, strlen(token_table[cnt]->operand[0]) + 1, token_table[cnt]->operand[0]);
+				char *deli = strchr(cpy, '/');
+				char sym1[10];
+				char sym2[10];
+				*deli = '\0';
+
+				strcpy_s(sym2, strlen(deli + 1) + 1, deli + 1);
+				strcpy_s(sym1, strlen(cpy) + 1, cpy);
+
+				int sym1_idx = search_symbol(sym1, now_section);
+				int sym2_idx = search_symbol(sym2, now_section);
+
+				int tmp = 0;
+				tmp = (sym_table[sym1_idx]->addr) / (sym_table[sym2_idx]->addr);
+				if (tmp < 0) { // 0보다 작아지는 경우.
+					tmp = 0x0FFF & tmp;
+				}
+				token_table[cnt]->obcode = (char *)malloc(len + 1);
+				sprintf_s(token_table[cnt]->obcode, len + 1, "%0*X", len, tmp);
+			}
+			else if (strchr(token_table[cnt]->operand[0], '%') != NULL) {
+				char cpy[20];
+				strcpy_s(cpy, strlen(token_table[cnt]->operand[0]) + 1, token_table[cnt]->operand[0]);
+				char *deli = strchr(cpy, '%');
+				char sym1[10];
+				char sym2[10];
+				*deli = '\0';
+
+				strcpy_s(sym2, strlen(deli + 1) + 1, deli + 1);
+				strcpy_s(sym1, strlen(cpy) + 1, cpy);
+
+				int sym1_idx = search_symbol(sym1, now_section);
+				int sym2_idx = search_symbol(sym2, now_section);
+
+				int tmp = 0;
+				tmp = (sym_table[sym1_idx]->addr) % (sym_table[sym2_idx]->addr);
+				if (tmp < 0) { // 0보다 작아지는 경우.
+					tmp = 0x0FFF & tmp;
+				}
+				token_table[cnt]->obcode = (char *)malloc(len + 1);
+				sprintf_s(token_table[cnt]->obcode, len + 1, "%0*X", len, tmp);
+			}
+			else {
+
 			}
 		}
 		op_idx = search_opcode(token_table[cnt]->operator_);
@@ -623,9 +747,37 @@ static int assem_pass2(void)
 					}
 				}
 			}
-			token_table[cnt]->obcode = obcode;
 
+			token_table[cnt]->obcode = (char *)malloc(sizeof(char) * 2 * format + 1);
+			sprintf_s(token_table[cnt]->obcode, sizeof(char) * 2 * format + 1, "%0*X", format * 2, obcode);
 		}
+	}
+	for (cnt = 0; cnt < token_line; cnt++) {
+		if (strcmp(token_table[cnt]->operator_, "EXTDEF") != 0 &&
+			strcmp(token_table[cnt]->operator_, "EXTREF") != 0 &&
+			strcmp(token_table[cnt]->operator_, "LTORG") != 0 &&
+			strcmp(token_table[cnt]->operator_, "CSECT") != 0 &&
+			strcmp(token_table[cnt]->operator_, "END") != 0) {
+			printf("%04X\t", token_table[cnt]->addr);
+		}
+		else {
+			if (strcmp(token_table[cnt]->operator_, "CSECT") == 0)
+				printf("\n");
+
+			printf("\t");
+		}
+		printf("%s\t\t", token_table[cnt]->label);
+		printf("%s\t", token_table[cnt]->operator_);
+		printf("%s", token_table[cnt]->operand[0]);
+		if (strlen(token_table[cnt]->operand[1]) > 0)
+			printf(",");
+		printf("%s", token_table[cnt]->operand[1]);
+		if (strlen(token_table[cnt]->operand[2]) > 0)
+			printf(",");
+		printf("%s\t", token_table[cnt]->operand[2]);
+		if (token_table[cnt]->obcode != NULL)
+			printf("%s", token_table[cnt]->obcode);
+		printf("\n");
 	}
 	return 0;
 }
@@ -644,37 +796,219 @@ void make_objectcode_output(char *file_name)
 {
 	/* add your code here */
 	int cnt = 0;
+	ob_line_num = 0;
+	int full_len = 0;
 	for (cnt = 0; cnt < token_line; cnt++) {
-		if (strcmp(token_table[cnt]->operator_, "CSECT") == 0)
-			printf("\n");
-		if (strcmp(token_table[cnt]->operator_, "START") != 0 &&
-			strcmp(token_table[cnt]->operator_, "EXTDEF") != 0 &&
-			strcmp(token_table[cnt]->operator_, "EXTREF") != 0 &&
-			strcmp(token_table[cnt]->operator_, "LTORG") != 0 &&
-			strcmp(token_table[cnt]->operator_, "CSECT") != 0 &&
-			strcmp(token_table[cnt]->operator_, "END") != 0) {
-			printf("%04X\t", token_table[cnt]->addr);
+		char _obcode[70] = { 0, };
+
+		if (strcmp(token_table[cnt]->operator_, "START") == 0 ||
+			strcmp(token_table[cnt]->operator_, "EXTDEF") == 0 ||
+			strcmp(token_table[cnt]->operator_, "EXTREF") == 0 ||
+			strcmp(token_table[cnt]->operator_, "END") == 0 ||
+			strcmp(token_table[cnt]->operator_, "CSECT") == 0
+			) {
+			if (cnt == 0) {
+				if (strcmp(token_table[cnt]->operator_, "START") == 0) {
+					_obcode[0] = 'H';
+
+					strcpy_s(now_section, strlen(token_table[cnt]->label) + 1, token_table[cnt]->label);	// 섹션 초기화.
+					_obcode[0] = 'H'; // 1번째에 H레코드 표기
+					strcpy_s(&_obcode[1], strlen(token_table[cnt]->label) + 1, token_table[cnt]->label); // 프로그램 이름 기입
+					int cnt2 = 0;
+					for (cnt2 = strlen(token_table[cnt]->label) + 1; cnt2 < 7; cnt2++) { // 남는자리 공백
+						_obcode[cnt2] = ' ';
+					}
+					_obcode[19] = '\0';
+					sprintf_s(&_obcode[7], 7, "%06X", atoi(token_table[cnt]->operand[0]));
+					sprintf_s(&_obcode[13], 7, "000000");
+				}
+				else return -1;
+			}
+			else {
+				if (strcmp(token_table[cnt]->operator_, "EXTDEF") == 0) {
+					_obcode[0] = 'D';
+					int cnt2 = 0;
+					for (cnt2 = 0; cnt2 < MAX_OPERAND; cnt2++) {
+						if (strlen(token_table[cnt]->operand[cnt2]) > 0) {
+							strcpy_s(&_obcode[1 + cnt2 * 12], strlen(token_table[cnt]->operand[cnt2]) + 1, token_table[cnt]->operand[cnt2]);
+							int sym = 0;
+							sym = search_symbol(token_table[cnt]->operand[cnt2], now_section);
+							if (sym < 0)
+								return -1;
+							sprintf_s(&_obcode[1 + cnt2 * 12 + 6], 7, "%06X", sym_table[sym]->addr);
+
+						}
+					}
+				}
+				else if (strcmp(token_table[cnt]->operator_, "EXTREF") == 0) {
+					_obcode[0] = 'R';
+					int cnt2 = 0;
+					for (cnt2 = 0; cnt2 < MAX_OPERAND; cnt2++) {
+						if (strlen(token_table[cnt]->operand[cnt2]) > 0) {
+							strcpy_s(&_obcode[1 + cnt2 * 6], strlen(token_table[cnt]->operand[cnt2]) + 1, token_table[cnt]->operand[cnt2]);
+							int cnt3 = 0;
+							for (cnt3 = cnt2 * 6; !('A' <= _obcode[cnt3] && _obcode[cnt3] <= 'Z'); cnt3--) {
+								_obcode[cnt3] = ' ';
+							}
+						}
+					}
+				}
+				else if (strcmp(token_table[cnt]->operator_, "END") == 0) {
+					if (token_table[cnt + 1] != NULL) {
+						//literal
+						int cnt2 = 0;
+						for (cnt2 = cnt + 1; token_table[cnt2] != NULL; cnt2++) {
+							if (strlen(object_codes[ob_line_num - 1]) + strlen(token_table[cnt + 1]->obcode) < sizeof(char) * 70) {
+								char tmp[70];
+								strcpy_s(tmp, strlen(object_codes[ob_line_num - 1]) + 1, object_codes[ob_line_num - 1]);
+								free(object_codes[ob_line_num - 1]);
+								char len_str[3];
+								len_str[0] = tmp[7];
+								len_str[1] = tmp[8];
+								len_str[2] = '\0';
+								char *stop;
+								int len = strtol(len_str,&stop, 16);
+								printf("%02X\n", len);
+								len += strlen(token_table[cnt + 1]->obcode) / 2;
+								sprintf_s(len_str, sizeof(char) * 3, "%02X", len);
+								tmp[7] = len_str[0];
+								tmp[8] = len_str[1];
+								object_codes[ob_line_num - 1] = (char *)malloc(strlen(tmp) + 1 + strlen(token_table[cnt + 1]->obcode));
+								strcat_s(tmp, strlen(tmp) + strlen(token_table[cnt + 1]->obcode) + 1, token_table[cnt + 1]->obcode);
+								strcpy_s(object_codes[ob_line_num - 1], strlen(tmp) + 1, tmp);
+							}
+							else {
+								int t_len = 0;
+								char m_record[17];
+								int end_idx = 0;
+
+								_obcode[0] = 'T';
+								sprintf_s(&_obcode[1], sizeof(char) * 7, "%06X", full_len / 2);
+								_obcode[7] = _obcode[8] = '0';
+								_obcode[9] = '\0';
+								int cnt3 = 0;
+								for (cnt3 = cnt2; ; cnt3++, cnt2++) {
+									if (token_table[cnt3] == NULL) {
+										break;
+									}
+
+									else {
+										if (token_table[cnt3]->obcode != NULL) {
+											if (strlen(token_table[cnt3]->obcode) + t_len <= 60) {
+												strcpy_s(&_obcode[strlen(_obcode)], strlen(token_table[cnt3]->obcode) + 1, token_table[cnt3]->obcode);
+												t_len += strlen(token_table[cnt3]->obcode);
+												full_len += strlen(token_table[cnt3]->obcode);
+											}
+											else {
+												break;
+											}
+										}
+										else {
+											break;
+										}
+									}
+								}
+								char tmp[3];
+								sprintf_s(tmp, sizeof(char) * 3, "%02X", t_len / 2);
+								_obcode[7] = tmp[0];
+								_obcode[8] = tmp[1];
+								object_codes[ob_line_num] = (char *)malloc(strlen(_obcode) + 1);
+								strcpy_s(object_codes[ob_line_num], strlen(_obcode) + 1, _obcode);
+								ob_line_num++;
+								cnt--;
+							}
+						}
+					}
+					_obcode[0] = 'E';
+					sprintf_s(&_obcode[1], sizeof(char) * 7, "%06X", atoi(token_table[0]->operand[0]));
+					full_len = 0;
+
+					object_codes[ob_line_num] = (char *)malloc(strlen(_obcode) + 1);
+					strcpy_s(object_codes[ob_line_num], strlen(_obcode) + 1, _obcode);
+					ob_line_num++;
+
+					break;
+				}
+				else if (strcmp(token_table[cnt]->operator_, "CSECT") == 0) {
+					_obcode[0] = 'E';
+					full_len = 0;
+					strcpy_s(now_section, strlen(token_table[cnt]->label) + 1, token_table[cnt]->label);
+				}
+				
+			}
+
+			object_codes[ob_line_num] = (char *)malloc(strlen(_obcode) + 1);
+			strcpy_s(object_codes[ob_line_num], strlen(_obcode) + 1, _obcode);
+			ob_line_num++;
 		}
-		else
-			printf("\t");
-		printf("%s\t\t", token_table[cnt]->label);
-		printf("%s\t", token_table[cnt]->operator_);
-		printf("%s", token_table[cnt]->operand[0]);
-		if (strlen(token_table[cnt]->operand[1]) > 0)
-			printf(",");
-		printf("%s", token_table[cnt]->operand[1]);
-		if (strlen(token_table[cnt]->operand[2]) > 0)
-			printf(",");
-		printf("%s\t", token_table[cnt]->operand[2]);
-		int idx = search_opcode(token_table[cnt]->operator_);
-		if (idx >= 0)
-			printf("%X", token_table[cnt]->obcode);
-		else if (token_table[cnt]->operator_[0] == '=') {
-			printf("%X", token_table[cnt]->obcode);
+		else if (strcmp(token_table[cnt]->operator_, "LTORG") == 0 ||
+			strcmp(token_table[cnt]->operator_, "EQU") == 0) {
+			continue;
 		}
-		printf("\n");
+		else {
+			int t_len = 0;
+			
+			int end_idx = 0;
+
+			_obcode[0] = 'T';
+			
+			sprintf_s(&_obcode[1], sizeof(char) * 7, "%06X", full_len / 2);
+			_obcode[7] = _obcode[8] = '0';
+			_obcode[9] = '\0';
+			int cnt2 = 0;
+			for (cnt2 = cnt; ; cnt2++, cnt++) {
+				if (token_table[cnt2] == NULL) {
+					break;
+				}
+				else if (strcmp(token_table[cnt]->operator_, "RESB") == 0) {
+					full_len += atoi(token_table[cnt]->operand[0]) * sizeof(char);
+					continue;
+				}
+				else if (strcmp(token_table[cnt]->operator_, "RESW") == 0) {
+					full_len += atoi(token_table[cnt]->operand[0]) * sizeof(char) * 3;
+					continue;
+				}
+				else {
+					if (token_table[cnt2]->obcode != NULL) {
+						if (strlen(token_table[cnt2]->obcode) + t_len <= 60) {
+							strcpy_s(&_obcode[strlen(_obcode)], strlen(token_table[cnt2]->obcode) + 1, token_table[cnt2]->obcode);
+							int sym = search_symbol(token_table[cnt2]->operand[0], now_section);
+							if (sym >= 0 && token_table[cnt2]->operator_[0] == '+') { // m_rec
+								char m_record[17] = { 0, };
+								m_record[0] = 'M';
+								sprintf_s(&m_record[1], sizeof(char) * 7, "%06X", full_len / 2 + 1);
+								sprintf_s(&m_record[7], sizeof(char) * 3, "%02X", (full_len + strlen(token_table[cnt2]->obcode) - full_len + 4) / 2 - 1);
+								object_codes[ob_line_num] = (char *)malloc(strlen(m_record) + 1);
+								strcpy_s(object_codes[ob_line_num], strlen(m_record) + 1, m_record);
+								ob_line_num++;
+							}
+							t_len += strlen(token_table[cnt2]->obcode);
+							full_len += strlen(token_table[cnt2]->obcode);
+						}
+						else {
+							break;
+						}
+					}
+					else {
+						break;
+					}
+				}
+			}
+			char tmp[3];
+			sprintf_s(tmp, sizeof(char) * 3, "%02X", t_len/2);
+			_obcode[7] = tmp[0];
+			_obcode[8] = tmp[1];
+			object_codes[ob_line_num] = (char *)malloc(strlen(_obcode) + 1);
+			strcpy_s(object_codes[ob_line_num], strlen(_obcode) + 1, _obcode);
+			ob_line_num++;
+			cnt--;
+		}
 	}
-	printf("\n\n");
+
+	for (cnt = 0; object_codes[cnt] != NULL; cnt++) {
+		printf("%s\n", object_codes[cnt]);
+	}
+	printf("\n");
 	return;
 }
 
@@ -1004,6 +1338,42 @@ int get_register_num(char *name) {
 		return -1;
 	}
 }
+
+/* -----------------------------------------------------------------------------------
+* 설명 :
+* 매계 :
+* 반환 :
+*
+* -----------------------------------------------------------------------------------
+*/
+void fill_zero(int line, char* answer) {
+	int format = 0;
+	char tmp_str;
+	if (search_opcode(token_table[line]->operator_) < 0) {
+		answer = NULL;
+		return;
+	}
+	format = inst_table[search_opcode(token_table[line]->operator_)]->format;
+	if (format > 0) {
+		if (format == 3) {
+			if (token_table[line]->operator_[0] == '+') {
+				format = 4;
+			}
+			if (format == 3)
+				sprintf_s(answer, 7, "%06X", token_table[line]->obcode);
+			else sprintf_s(answer, 9, "%08X", token_table[line]->obcode);
+		}
+		else if (format == 2) {
+			sprintf_s(answer, 6, "%04X", token_table[line]->obcode);
+		}
+	}
+	else {
+		answer = NULL;
+	}
+
+}
+
+
 
 /* -----------------------------------------------------------------------------------
 * 설명 :

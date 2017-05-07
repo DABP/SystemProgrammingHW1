@@ -40,7 +40,7 @@ struct token_unit {				// input_data에 라인 단위로 저장된 소스코드를 파싱하여 저
 	char *operator_;			// operator 저장 (예약어, instruction)
 	char *operand[MAX_OPERAND];	// operand 저장 (인덱스는 0부터 2까지 총 3개 가능하다.)
 	char *comment;				// comment 저장.
-	unsigned int obcode;
+	char *obcode;
 	char nixbpe; // 추후 프로젝트에서 사용된다.
 };
 
@@ -73,6 +73,9 @@ literal_p *literal_table[MAX_LINES];		// literal_table 생성.
 int literal_num;						// literal_table row counter
 
 static int locctr;		// LOCATION COUNTER
+
+char *object_codes[70];	// full object codes.
+int ob_line_num;		// object code line number.
 //--------------
 
 static char *input_file;						// input.txt의 파일포인터
@@ -99,3 +102,4 @@ void add_symbol(int, char *, char *);
 int get_calculated_operand(int line, char* section);
 int search_symbol(char *name, char *section);
 int get_register_num(char *name);
+void fill_zero(int line, char* answer);
